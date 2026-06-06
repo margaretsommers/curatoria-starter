@@ -1,0 +1,19 @@
+{
+  "owner": {
+    "wallet": "0xYOUR_BASE_WALLET",
+    "name": "Your Name",
+    "url": "https://yourdomain.com"
+  },
+  "design_systems": [
+    {
+      "id": "example-minimal",
+      "file": "example-minimal.md",
+      "name": "Minimal SaaS Design System",
+      "description": "A small example product you can replace with your own design resource.",
+      "price_usd": "0.01",
+      "tags": ["starter", "example", "design-system"],
+      "published_at": "2026-05-08T00:00:00Z",
+      "active": true
+    }
+  ]
+}

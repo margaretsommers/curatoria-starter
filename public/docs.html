@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5efe3" />
+    <title>Docs - Curatoria Starter</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="topbar" aria-label="Primary navigation">
+        <a class="brand" href="./index.html">Curatoria Starter</a>
+        <div class="nav-links">
+          <a href="./docs.html" aria-current="page">Docs</a>
+          <a href="https://github.com/margaretsommers/curatoria-starter" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </nav>
+
+      <article class="panel docs">
+        <header class="docs-header">
+          <p class="eyebrow">Creator guide</p>
+          <h1>Set up your own x402 design catalog.</h1>
+          <p class="lede">
+            Follow the starter chapters in <code>docs/creator/</code> to fork the template,
+            connect a payout wallet, publish products, test x402, and deploy your own catalog.
+          </p>
+        </header>
+
+        <section class="callout" aria-labelledby="start-here">
+          <h2 id="start-here">Start here</h2>
+          <p>
+            <strong>Available today:</strong> Fork curatoria-starter, connect a wallet,
+            add files under <code>design-systems/</code>, and deploy the Node service.
+          </p>
+          <p>
+            <strong>Coming soon:</strong> Connect Google Drive, Dropbox, iCloud, or your
+            domain without moving files; automatic x402 Bazaar registration.
+          </p>
+        </section>
+
+        <section class="docs-section">
+          <h2>Setup chapters</h2>
+          <ul class="link-list">
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/00-readme.md" target="_blank" rel="noreferrer">
+                Start here
+              </a>
+              <span>Fork the template and understand what is available today.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/01-before-you-start.md" target="_blank" rel="noreferrer">
+                Before you start
+              </a>
+              <span>x402, machine-readable catalogs, and how agents pay for files.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/02-wallet-basics.md" target="_blank" rel="noreferrer">
+                Wallet basics
+              </a>
+              <span>Coinbase Wallet is recommended, and any Base USDC wallet can receive payouts.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/03-connect-your-storage.md" target="_blank" rel="noreferrer">
+                Connect your storage
+              </a>
+              <span>Planned connectors, plus the local <code>design-systems/</code> workaround today.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/04-products-and-prices.md" target="_blank" rel="noreferrer">
+                Products and prices
+              </a>
+              <span>Add your first product and define its price.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/05-markdown-vs-bundle.md" target="_blank" rel="noreferrer">
+                Markdown vs bundle
+              </a>
+              <span>Choose between a single design doc and a downloadable zip.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/06-test-on-testnet.md" target="_blank" rel="noreferrer">
+                Test on testnet
+              </a>
+              <span>Run the catalog and payment flow on Base Sepolia before mainnet.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/07-go-live.md" target="_blank" rel="noreferrer">
+                Go live
+              </a>
+              <span>Switch to Base mainnet and deploy your service.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/08-bazaar-listing.md" target="_blank" rel="noreferrer">
+                Bazaar listing
+              </a>
+              <span>Planned automation, with manual catalog sharing today.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/09-troubleshooting.md" target="_blank" rel="noreferrer">
+                Troubleshooting
+              </a>
+              <span>Common startup, catalog, 402, payment, and file delivery problems.</span>
+            </li>
+            <li>
+              <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/appendix-self-host.md" target="_blank" rel="noreferrer">
+                Advanced self-hosting
+              </a>
+              <span>Railway, Fly, Render, VMs, DNS, and production checks.</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="docs-section">
+          <h2>What works in this starter</h2>
+          <ol class="steps">
+            <li>The public catalog endpoint lists product metadata.</li>
+            <li>Protected product routes return <code>402</code> until payment is supplied.</li>
+            <li>Local files under <code>design-systems/</code> are the source of truth today.</li>
+            <li>Storage connectors and automatic Bazaar registration are planned, not shipped.</li>
+          </ol>
+        </section>
+
+        <footer class="footer">
+          <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/acceptable-use-and-content-ownership.md" target="_blank" rel="noreferrer">
+            Acceptable use and content ownership
+          </a>
+        </footer>
+      </article>
+    </main>
+  </body>
+</html>

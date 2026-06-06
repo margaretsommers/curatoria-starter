@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5efe3" />
+    <title>Curatoria Starter</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="topbar" aria-label="Primary navigation">
+        <a class="brand" href="./index.html">Curatoria Starter</a>
+        <div class="nav-links">
+          <a href="./docs.html">Docs</a>
+          <a href="https://github.com/margaretsommers/curatoria-starter" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </nav>
+
+      <section class="hero panel">
+        <p class="eyebrow">x402 paywalls for creator catalogs</p>
+        <h1>Fork a minimal service for selling design files to agents.</h1>
+        <p class="lede">
+          Curatoria Starter gives creators a small Node service, a public catalog endpoint,
+          and example product files so AI agents can discover paid design resources over HTTP.
+        </p>
+        <div class="actions" aria-label="Starter actions">
+          <a class="button" href="https://github.com/margaretsommers/curatoria-starter" target="_blank" rel="noreferrer">
+            Use the template
+          </a>
+          <a class="button button-secondary" href="./docs.html">Read the setup guide</a>
+        </div>
+      </section>
+
+      <section class="grid" aria-label="What the starter includes">
+        <article class="panel card">
+          <h2>Catalog first</h2>
+          <p>
+            Publish a machine-readable catalog at
+            <code>/.well-known/design-catalog.json</code> with product names, prices,
+            tags, and paid routes.
+          </p>
+        </article>
+        <article class="panel card">
+          <h2>402 by default</h2>
+          <p>
+            Unpaid file requests return <code>402 Payment Required</code>. Paid requests
+            are verified through the x402 flow before files are delivered.
+          </p>
+        </article>
+        <article class="panel card">
+          <h2>Bring your own work</h2>
+          <p>
+            Replace the example item under <code>design-systems/</code>, set your wallet
+            address, test on Base Sepolia, then deploy your own instance.
+          </p>
+        </article>
+      </section>
+
+      <section class="panel split">
+        <div>
+          <p class="eyebrow">Available today</p>
+          <h2>Self-hosted starter path</h2>
+        </div>
+        <ol class="steps">
+          <li>Fork or clone the starter template.</li>
+          <li>Set <code>WALLET_ADDRESS</code>, <code>ADMIN_API_KEY</code>, and <code>NETWORK</code>.</li>
+          <li>Add files and registry entries under <code>design-systems/</code>.</li>
+          <li>Run <code>npm run dev</code> and confirm catalog plus 402 behavior.</li>
+        </ol>
+      </section>
+
+      <footer class="footer">
+        <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/acceptable-use-and-content-ownership.md" target="_blank" rel="noreferrer">
+          Acceptable use and content ownership
+        </a>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "curatoria-starter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Starter template for creator-owned x402 paywalled design resources",
+  "homepage": "https://github.com/margaretsommers/curatoria-starter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/margaretsommers/curatoria-starter.git"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @curatoria/service",
+    "start": "npm run start --workspace @curatoria/service",
+    "build": "npm run build --workspace @curatoria/service",
+    "smoke": "npm run smoke --workspace @curatoria/service",
+    "publish-design": "npm run publish-design --workspace @curatoria/service --",
+    "publish-pack": "npm run publish-pack --workspace @curatoria/service --",
+    "dev:site": "npm run dev --workspace @curatoria/site",
+    "start:site": "npm run start --workspace @curatoria/site"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
