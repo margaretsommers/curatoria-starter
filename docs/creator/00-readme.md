@@ -20,15 +20,16 @@ Today, the working path is technical but direct:
 7. Publish markdown or bundle products with the CLI.
 8. Deploy the Node service so agents can read your public catalog.
 
-The local service gives you three core URLs:
+The local service gives you the setup guide plus three core service URLs:
 
 ```bash
-http://localhost:3000/
+http://localhost:3000/docs.html
 http://localhost:3000/.well-known/design-catalog.json
+http://localhost:3000/health
 http://localhost:3000/design-systems/example-minimal
 ```
 
-The catalog endpoint is free. Paid design files and bundle downloads return `402` until the client sends a valid x402 payment.
+The root path redirects to the setup guide. The catalog endpoint is free. Paid design files and bundle downloads return `402` until the client sends a valid x402 payment.
 
 ## Planned
 

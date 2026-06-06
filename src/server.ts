@@ -6,6 +6,7 @@
  *   FREE    /.well-known/design-catalog.json  — catalog for agent discovery
  *           /design-systems                   — alias for the above
  *           /health                           — uptime check
+ *           /                                 — redirects to local setup docs
  *
  *   PAID    /design-systems/:id               — returns design.md after payment
  *           (X402 payment required, ~$0.01 USDC per access)
@@ -120,6 +121,9 @@ async function startServer(): Promise<void> {
   app.use(helmet());
   app.use(cors());
   app.use(express.json());
+  app.get('/', (_req, res) => {
+    res.redirect(302, '/docs.html');
+  });
   app.use(express.static(path.resolve(__dirname, '../public')));
 
   // ─── Free: Discovery ────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
   "name": "@curatoria/site",
   "version": "1.0.0",
   "private": true,
-  "description": "Curatoria landing site workspace",
+  "description": "Curatoria local docs page workspace",
   "scripts": {
     "dev": "python3 -m http.server 3000 --directory ../../public",
     "start": "python3 -m http.server 3000 --directory ../../public"

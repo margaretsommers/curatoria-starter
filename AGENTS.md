@@ -7,7 +7,7 @@ This repository is a public starter template for creators who want to sell origi
 - `src/` for paywall service behavior
 - `scripts/` for publish and smoke-test tooling
 - `design-systems/` for example or creator-owned products
-- `public/` for the optional creator landing site
+- `public/` for the local creator docs page
 - `docs/` for public creator documentation
 - `apps/` for workspace package wrappers
 

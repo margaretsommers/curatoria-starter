@@ -1,6 +1,6 @@
 # Curatoria Starter
 
-Curatoria Starter is a template for selling original design resources through an x402 paywall. It runs one Node service that serves your public site, catalog metadata, and paid resource endpoints.
+Curatoria Starter is a template for selling original design resources through an x402 paywall. It runs one Node service that serves catalog metadata, paid resource endpoints, and a local setup guide.
 
 ## What You Get
 
@@ -44,8 +44,9 @@ Curatoria Starter is a template for selling original design resources through an
 
 Open:
 
-- Site: `http://localhost:3000`
+- Local setup guide: `http://localhost:3000/docs.html` (`/` redirects here)
 - Catalog: `http://localhost:3000/.well-known/design-catalog.json`
+- Health: `http://localhost:3000/health`
 - Paywall check: `http://localhost:3000/design-systems/example-minimal`
 
 The paid route should return `402 Payment Required` until a valid x402 payment is provided.

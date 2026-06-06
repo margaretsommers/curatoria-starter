@@ -79,10 +79,6 @@ code {
   box-shadow: var(--shadow);
 }
 
-.hero {
-  padding: clamp(2rem, 7vw, 5rem);
-}
-
 .eyebrow {
   margin: 0 0 0.8rem;
   color: var(--accent);
@@ -118,66 +114,12 @@ h2 {
   font-size: clamp(1.08rem, 2.2vw, 1.35rem);
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
-  margin-top: 2rem;
-}
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--accent-dark);
-  border-radius: 999px;
-  background: var(--ink);
-  color: #fffaf0;
-  font-weight: 700;
-  min-height: 48px;
-  padding: 0.75rem 1.2rem;
-  text-decoration: none;
-}
-
-.button:hover {
-  color: #fffaf0;
-  background: var(--accent-dark);
-}
-
-.button-secondary {
-  background: transparent;
-  color: var(--ink);
-}
-
-.button-secondary:hover {
-  color: var(--ink);
-  background: var(--panel-strong);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.card,
-.split,
 .docs {
   padding: clamp(1.3rem, 4vw, 2.2rem);
 }
 
-.card p,
-.split p,
 .docs p {
   color: var(--muted);
-}
-
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 1.5rem;
-  margin-top: 1rem;
 }
 
 .steps {
@@ -246,8 +188,7 @@ h2 {
 }
 
 @media (max-width: 760px) {
-  .topbar,
-  .split {
+  .topbar {
     align-items: flex-start;
     grid-template-columns: 1fr;
   }
@@ -256,11 +197,4 @@ h2 {
     flex-direction: column;
   }
 
-  .grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hero {
-    border-radius: 24px;
-  }
 }
