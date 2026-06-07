@@ -23,6 +23,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
 import { findEntry } from './catalog';
 import {
   PaymentRequired,
@@ -52,11 +53,14 @@ function usdToMicro(usd: string): string {
 function buildPaymentRequired(
   id: string,
   name: string,
+  description: string,
+  tags: string[],
   priceUsd: string,
   resource: string,
   network: string,
   payTo: string,
   mimeType: string,
+  isBundle: boolean,
 ): PaymentRequired {
   const accept: PaymentAccept = {
     scheme: 'exact',
@@ -75,6 +79,37 @@ function buildPaymentRequired(
     x402Version: 1,
     accepts: [accept],
     error: `Payment of $${priceUsd} USDC required to access "${name}"`,
+    extensions: {
+      ...declareDiscoveryExtension({
+        input: { id },
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Catalog slug for the paid Curatoria resource.',
+            },
+          },
+          required: ['id'],
+        },
+        output: {
+          example: isBundle ? '<zip binary bytes>' : '# paid design markdown\n',
+          schema: {
+            type: 'string',
+            description: isBundle
+              ? 'Zip binary content returned after successful x402 settlement.'
+              : 'Markdown content returned after successful x402 settlement.',
+          },
+        },
+      }),
+      curatoria: {
+        id,
+        name,
+        description,
+        tags,
+        resourceType: isBundle ? 'bundle_zip' : 'design_md',
+      },
+    },
   };
 }
 
@@ -141,6 +176,7 @@ export function x402Paywall(config: X402Config) {
 
     const responseMimeType =
       entry.mime_type ?? (entryResourceType === 'bundle_zip' ? 'application/zip' : 'text/markdown');
+    const isBundle = entryResourceType === 'bundle_zip';
 
     const resource = req.originalUrl;
     const paymentHeader = req.headers['x-payment'] as string | undefined;
@@ -150,11 +186,14 @@ export function x402Paywall(config: X402Config) {
       const paymentRequired = buildPaymentRequired(
         entry.id,
         entry.name,
+        entry.description,
+        entry.tags,
         entry.price_usd,
         resource,
         network,
         walletAddress,
         responseMimeType,
+        isBundle,
       );
 
       // X-PAYMENT-REQUIRED header carries a base64 encoding of the JSON body.
@@ -184,11 +223,14 @@ export function x402Paywall(config: X402Config) {
     const requirements = buildPaymentRequired(
       entry.id,
       entry.name,
+      entry.description,
+      entry.tags,
       entry.price_usd,
       resource,
       network,
       walletAddress,
       responseMimeType,
+      isBundle,
     ).accepts[0];
 
     // Verify: checks EIP-712 signature, nonce, and time window

@@ -83,7 +83,7 @@ The broader Curatoria direction is to make creator-owned agent commerce easier t
 - simpler guided setup for non-technical creators;
 - cloud storage connectors for existing folders;
 - richer rights and ownership metadata;
-- automatic discovery registration;
+- broader external Bazaar indexing coverage beyond declared metadata;
 - stronger publishing workflows for larger catalogs.
 
 Those are planned improvements. Today, the reliable path is the starter repo, local files, CLI publishing, x402 payment checks, and deployment of your own Node service.

@@ -51,7 +51,7 @@ Until those features ship, the honest production path is: local files in `design
 - `05-markdown-vs-bundle.md` helps choose between markdown and zip products.
 - `06-test-on-testnet.md` walks through Base Sepolia testing.
 - `07-go-live.md` covers mainnet and deployment.
-- `08-bazaar-listing.md` explains manual discovery today and planned Bazaar automation.
+- `08-bazaar-listing.md` explains built-in Bazaar metadata today and what external indexing still needs.
 - `09-troubleshooting.md` collects common failures.
 
 ## Quick Start

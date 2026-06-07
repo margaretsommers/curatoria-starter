@@ -75,6 +75,7 @@ export interface PaymentRequired {
   x402Version: number;
   accepts: PaymentAccept[];
   error: string;
+  extensions?: Record<string, unknown>;
 }
 
 export interface PaymentAccept {
@@ -106,6 +107,7 @@ export interface PaymentPayload {
       nonce: string;
     };
   };
+  extensions?: Record<string, unknown>;
 }
 
 /** Facilitator /verify response */

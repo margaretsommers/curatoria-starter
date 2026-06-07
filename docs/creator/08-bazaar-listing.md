@@ -1,9 +1,9 @@
 # Bazaar Listing
 
-> **Available today:** partial
+> **Available today:** yes
 > **Requires terminal:** yes
 
-Automatic Bazaar registration is planned, not built yet. Today, agents can still discover your Curatoria catalog if you share or publish your catalog URL.
+Curatoria now declares Bazaar discovery metadata directly in each `402 Payment Required` challenge. That means every published product exposes machine-readable discovery details without any extra publish step.
 
 Your catalog URL is the important public entry point:
 
@@ -36,9 +36,20 @@ To verify your deployed catalog:
 curl https://YOUR_DOMAIN/.well-known/design-catalog.json
 ```
 
-## Current Workaround
+## What Is Automatic Today
 
-Until automatic Bazaar registration exists, use manual discovery:
+When an agent requests a paid route:
+
+- Curatoria returns a `402` challenge;
+- the challenge includes `extensions.bazaar` from `declareDiscoveryExtension(...)`;
+- metadata is generated from your live registry entry (ID, name, tags, type);
+- updates to products and prices are reflected on the next request automatically.
+
+Because metadata is attached to the payment challenge, publishing or repricing products does not require a separate discovery registration command.
+
+## Still Manual Today
+
+You still need to make sure agents can find your catalog URL:
 
 - link your catalog URL from your website;
 - include it in your `llms.txt` if you maintain one;
@@ -46,30 +57,15 @@ Until automatic Bazaar registration exists, use manual discovery:
 - include it in product docs, launch posts, and demos;
 - keep the endpoint stable so agents can revisit it.
 
-If a Bazaar or x402 discovery directory accepts manual submissions, submit the catalog URL there. The starter does not currently perform that registration for you.
+Some discovery directories may also require manual submission or their own indexing policy.
 
-## Planned
+## What Is Not Guaranteed Yet
 
-The planned path is automatic discovery registration. In that version, Curatoria would be able to declare or register a discovery extension so Bazaar-style services can index your catalog without a manual submission step.
+- Curatoria does not force external Bazaar operators to index your catalog.
+- Curatoria does not control third-party refresh cadence or ranking.
+- Curatoria does not replace the need for a stable public domain/catalog URL.
 
-When this ships, creators should be able to:
-
-- deploy their catalog;
-- confirm the public URL;
-- register with Bazaar-style discovery from the Curatoria workflow;
-- refresh listing metadata when product names, tags, or prices change.
-
-## What Not To Assume Yet
-
-The starter does not currently:
-
-- call a Bazaar registration API;
-- implement `declareDiscoveryExtension`;
-- guarantee indexing by any external marketplace;
-- update third-party listings when your registry changes;
-- replace the need for a stable public catalog URL.
-
-The working model today is simple: deploy Curatoria, verify `/.well-known/design-catalog.json`, and share that URL wherever agents or buyers can find it.
+The working model today: deploy Curatoria, verify `/.well-known/design-catalog.json`, and rely on built-in discovery metadata in each `402` challenge while you continue sharing your catalog URL.
 
 ## Useful Links
 
