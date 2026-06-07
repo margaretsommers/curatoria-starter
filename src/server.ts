@@ -22,7 +22,8 @@ import cors from 'cors';
 import path from 'path';
 
 import { handleDiscovery } from './discovery';
-import { findEntry, readDesignFile, readBundleFile, appendEntry, readCatalog } from './catalog';
+import { findEntry, appendEntry, readCatalog } from './catalog';
+import { resolveResource, storageStatus } from './sources';
 import { x402Paywall } from './x402';
 import { PublishRequest, DesignSystemEntry } from './types';
 
@@ -134,7 +135,12 @@ async function startServer(): Promise<void> {
   app.get('/design-systems', handleDiscovery);
 
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', network: NETWORK, wallet: resolvedWalletAddress });
+    res.json({
+      status: 'ok',
+      network: NETWORK,
+      wallet: resolvedWalletAddress,
+      storage: storageStatus(),
+    });
   });
 
   // ─── Paid: Design System Content ───────────────────────────────────────────
@@ -150,7 +156,7 @@ async function startServer(): Promise<void> {
       facilitatorUrl: FACILITATOR_URL,
       expectedResourceType: 'design_md',
     }),
-    (req, res) => {
+    async (req, res) => {
       const entry = findEntry(req.params.id);
       if (!entry) {
         // Shouldn't happen (middleware 404s first) but guards the type
@@ -158,20 +164,24 @@ async function startServer(): Promise<void> {
         return;
       }
 
-      let content: string;
+      let resolved;
       try {
-        content = readDesignFile(entry);
+        resolved = await resolveResource(entry);
       } catch (err) {
-        res.status(500).json({ error: 'Design file missing from disk', detail: String(err) });
+        // The buyer already paid; surface a server error but never leak the
+        // underlying source URL or credentials.
+        console.error(`Source resolution failed for "${entry.id}": ${String(err)}`);
+        res.status(502).json({ error: 'Could not retrieve product from its storage source' });
         return;
       }
 
       res
-        .setHeader('Content-Type', `${entry.mime_type ?? 'text/markdown'}; charset=utf-8`)
+        .setHeader('Content-Type', `${resolved.mimeType}; charset=utf-8`)
         .setHeader('X-Design-System-Id', entry.id)
         .setHeader('X-Design-System-Name', entry.name)
         .setHeader('X-Design-System-Version', '1.0.0')
-        .send(content);
+        .setHeader('X-Storage-Source', resolved.sourceType)
+        .send(resolved.buffer);
     },
   );
 
@@ -183,29 +193,30 @@ async function startServer(): Promise<void> {
       facilitatorUrl: FACILITATOR_URL,
       expectedResourceType: 'bundle_zip',
     }),
-    (req, res) => {
+    async (req, res) => {
       const entry = findEntry(req.params.id);
       if (!entry) {
         res.status(404).json({ error: 'Bundle not found' });
         return;
       }
 
-      let content: Buffer;
+      let resolved;
       try {
-        content = readBundleFile(entry);
+        resolved = await resolveResource(entry);
       } catch (err) {
-        res.status(500).json({ error: 'Bundle file missing from disk', detail: String(err) });
+        console.error(`Source resolution failed for "${entry.id}": ${String(err)}`);
+        res.status(502).json({ error: 'Could not retrieve bundle from its storage source' });
         return;
       }
 
-      const filename = entry.bundle_file ?? entry.file;
       res
-        .setHeader('Content-Type', entry.mime_type ?? 'application/zip')
-        .setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+        .setHeader('Content-Type', resolved.mimeType)
+        .setHeader('Content-Disposition', `attachment; filename="${resolved.filename}"`)
         .setHeader('X-Design-System-Id', entry.id)
         .setHeader('X-Design-System-Name', entry.name)
         .setHeader('X-Design-System-Version', '1.0.0')
-        .send(content);
+        .setHeader('X-Storage-Source', resolved.sourceType)
+        .send(resolved.buffer);
     },
   );
 

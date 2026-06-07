@@ -2,11 +2,37 @@
 
 export type ResourceType = 'design_md' | 'bundle_zip';
 
+/**
+ * Where a product's sellable bytes actually live.
+ *
+ *   local  — a file inside the repo's design-systems/ directory (default)
+ *   url    — a direct https:// URL you control (your domain, a CDN, object storage)
+ *   gdrive — a Google Drive file shared as "Anyone with the link can view"
+ *
+ * Only registry metadata (price, name, tags) is ever stored locally for url/gdrive
+ * sources; the bytes are fetched on demand after a successful x402 payment.
+ */
+export type StorageSourceType = 'local' | 'url' | 'gdrive';
+
+export interface EntrySource {
+  /** Connector kind. Defaults to 'local' when omitted. */
+  type: StorageSourceType;
+  /** Direct https URL for type 'url'. */
+  url?: string;
+  /** Google Drive file ID for type 'gdrive' (the long token in the share link). */
+  file_id?: string;
+}
+
 export interface DesignSystemEntry {
   /** URL-safe slug used in the route: GET /design-systems/:id */
   id: string;
-  /** Markdown filename inside design-systems/ directory */
+  /**
+   * Display filename / local path inside design-systems/.
+   * For url and gdrive sources this is a label only; the bytes come from `source`.
+   */
   file: string;
+  /** Where the sellable bytes live. Absent means a local design-systems/ file. */
+  source?: EntrySource;
   /** Resource kind for routing + response behavior */
   resource_type?: ResourceType;
   /** Optional bundle filename for downloadable zip products */

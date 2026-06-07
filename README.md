@@ -73,7 +73,19 @@ npm run publish-pack -- \
   --price 12.00
 ```
 
-Both commands update `design-systems/.registry.json`, which powers the public catalog and paid endpoints.
+You do not have to commit the file. You can also sell from a URL you control or from Google Drive by swapping the source flag:
+
+```bash
+# From your own domain / CDN / object storage
+npm run publish-design -- --id my-doc --url https://files.yourdomain.com/my-doc.md \
+  --name "My Doc" --price 5.00
+
+# From a Google Drive file shared "Anyone with the link can view"
+npm run publish-design -- --id my-doc --gdrive-id "https://drive.google.com/file/d/<ID>/view" \
+  --name "My Doc" --price 5.00
+```
+
+See `docs/creator/03-connect-your-storage.md` for the full storage guide. All commands update `design-systems/.registry.json`, which powers the public catalog and paid endpoints.
 
 ## Deploy
 
@@ -87,9 +99,9 @@ https://yourdomain.com/.well-known/design-catalog.json
 
 ## What Is Planned
 
-Available today: local files in `design-systems/`, CLI publishing, x402 payment checks, and self-hosted deployment.
+Available today: local files in `design-systems/`, direct URL / your-domain sources, Google Drive sources, CLI publishing, x402 payment checks, and self-hosted deployment.
 
-Coming soon: cloud storage connectors, no-terminal publishing, and automatic x402 Bazaar registration.
+Coming soon: Dropbox and iCloud connectors, OAuth-based Google Drive, no-terminal publishing, and automatic x402 Bazaar registration.
 
 ## Safety Notes
 
