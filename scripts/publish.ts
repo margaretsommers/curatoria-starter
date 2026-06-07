@@ -22,7 +22,15 @@
  *     --name "My Doc" --price 0.05
  *   (You can also paste the full Drive share link to --gdrive-id.)
  *
- * Provide exactly one of --file, --url, or --gdrive-id. For --file the .md must
+ * Usage (Dropbox share URL, Mode A link-share):
+ *   npm run publish-design -- --id my-doc --dropbox-url "https://www.dropbox.com/s/.../my-doc.md?dl=0" \
+ *     --name "My Doc" --price 0.05
+ *
+ * Usage (Dropbox private file path, Mode B OAuth):
+ *   npm run publish-design -- --id my-doc --dropbox-path "/Design Systems/my-doc.md" \
+ *     --name "My Doc" --price 0.05
+ *
+ * Provide exactly one of --file, --url, --gdrive-id, --dropbox-url, or --dropbox-path. For --file the .md must
  * already exist in design-systems/. To unlist, set active: false in .registry.json.
  */
 
@@ -59,7 +67,9 @@ if (missing.length) {
   console.error('Usage (choose one source):');
   console.error('  npm run publish-design -- --id <slug> --file <path>       --name "<name>" --price <usd>');
   console.error('  npm run publish-design -- --id <slug> --url <https://...> --name "<name>" --price <usd>');
-  console.error('  npm run publish-design -- --id <slug> --gdrive-id <id>    --name "<name>" --price <usd>\n');
+  console.error('  npm run publish-design -- --id <slug> --gdrive-id <id>    --name "<name>" --price <usd>');
+  console.error('  npm run publish-design -- --id <slug> --dropbox-url <https://www.dropbox.com/...> --name "<name>" --price <usd>');
+  console.error('  npm run publish-design -- --id <slug> --dropbox-path </path/in/dropbox> --name "<name>" --price <usd>\n');
   process.exit(1);
 }
 
@@ -83,6 +93,8 @@ try {
     file: args.file,
     url: args.url,
     gdriveId: args['gdrive-id'],
+    dropboxUrl: args['dropbox-url'],
+    dropboxPath: args['dropbox-path'],
     kind: 'design_md',
   });
 } catch (err) {
@@ -121,7 +133,13 @@ appendEntry(entry);
 console.log('');
 console.log(`  ✓ Published "${entry.name}"`);
 console.log(`    ID:     ${entry.id}`);
-console.log(`    Source: ${entry.source ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id})` : `local (${entry.file})`}`);
+console.log(
+  `    Source: ${
+    entry.source
+      ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id ?? entry.source.share_url ?? entry.source.dropbox_path})`
+      : `local (${entry.file})`
+  }`,
+);
 console.log(`    Price:  $${entry.price_usd} USDC per access`);
 if (entry.tags.length) console.log(`    Tags:  ${entry.tags.join(', ')}`);
 console.log('');

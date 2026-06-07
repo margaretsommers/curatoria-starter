@@ -20,7 +20,15 @@
  *   npm run publish-pack -- --id my-pack --gdrive-id 1AbC...xyz \
  *     --name "My Pack" --price 0.10
  *
- * Provide exactly one of --zip, --url, or --gdrive-id.
+ * Usage (Dropbox share URL, Mode A link-share):
+ *   npm run publish-pack -- --id my-pack --dropbox-url "https://www.dropbox.com/s/.../my-pack.zip?dl=0" \
+ *     --name "My Pack" --price 0.10
+ *
+ * Usage (Dropbox private file path, Mode B OAuth):
+ *   npm run publish-pack -- --id my-pack --dropbox-path "/Design Systems/my-pack.zip" \
+ *     --name "My Pack" --price 0.10
+ *
+ * Provide exactly one of --zip, --url, --gdrive-id, --dropbox-url, or --dropbox-path.
  */
 
 import fs from 'fs';
@@ -52,7 +60,9 @@ if (missing.length) {
   console.error('Usage (choose one source):');
   console.error('  npm run publish-pack -- --id <slug> --zip <path>         --name "<name>" --price <usd>');
   console.error('  npm run publish-pack -- --id <slug> --url <https://...>  --name "<name>" --price <usd>');
-  console.error('  npm run publish-pack -- --id <slug> --gdrive-id <id>     --name "<name>" --price <usd>\n');
+  console.error('  npm run publish-pack -- --id <slug> --gdrive-id <id>     --name "<name>" --price <usd>');
+  console.error('  npm run publish-pack -- --id <slug> --dropbox-url <https://www.dropbox.com/...> --name "<name>" --price <usd>');
+  console.error('  npm run publish-pack -- --id <slug> --dropbox-path </path/in/dropbox> --name "<name>" --price <usd>\n');
   process.exit(1);
 }
 
@@ -76,6 +86,8 @@ try {
     file: args.zip,
     url: args.url,
     gdriveId: args['gdrive-id'],
+    dropboxUrl: args['dropbox-url'],
+    dropboxPath: args['dropbox-path'],
     kind: 'bundle_zip',
   });
 } catch (err) {
@@ -118,7 +130,13 @@ appendEntry(entry);
 console.log('');
 console.log(`  ✓ Published bundle "${entry.name}"`);
 console.log(`    ID:     ${entry.id}`);
-console.log(`    Source: ${entry.source ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id})` : `local (${entry.bundle_file})`}`);
+console.log(
+  `    Source: ${
+    entry.source
+      ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id ?? entry.source.share_url ?? entry.source.dropbox_path})`
+      : `local (${entry.bundle_file})`
+  }`,
+);
 console.log(`    Price:  $${entry.price_usd} USDC per download`);
 if (entry.tags.length) console.log(`    Tags:  ${entry.tags.join(', ')}`);
 console.log('');

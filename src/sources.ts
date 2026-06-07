@@ -1,14 +1,15 @@
 /**
  * sources.ts — storage connectors for sellable product bytes.
  *
- * A registry entry can live in one of three places:
+ * A registry entry can live in one of four places:
  *
  *   local  — a file inside design-systems/ (the original behavior, still the default)
  *   url    — a direct https:// URL you control (your domain, a CDN, object storage)
- *   gdrive — a Google Drive file shared as "Anyone with the link can view"
+ *   gdrive  — a Google Drive file shared as "Anyone with the link can view"
+ *   dropbox — a Dropbox file shared by link (Mode A) or private path via OAuth (Mode B)
  *
  * Catalog metadata (price, name, tags) always lives in design-systems/.registry.json.
- * For url and gdrive sources only the *bytes* are remote — they are fetched on demand
+ * For url, gdrive, and dropbox sources only the *bytes* are remote — they are fetched on demand
  * after a successful x402 payment, never cached to disk, and never exposed before
  * payment because resolution only happens inside the paid route handler.
  *
@@ -42,6 +43,26 @@ const GOOGLE_HOSTS = new Set([
   'drive.usercontent.google.com',
   'docs.google.com',
 ]);
+
+export const DROPBOX_HOSTS = new Set([
+  'www.dropbox.com',
+  'dl.dropboxusercontent.com',
+  'content.dropboxapi.com',
+]);
+
+const DROPBOX_TOKEN_REFRESH_SKEW_MS = 5 * 60 * 1000;
+
+interface DropboxTokenCache {
+  accessToken: string;
+  expiresAtMs: number;
+}
+
+let dropboxTokenCache: DropboxTokenCache | undefined;
+
+/** Test-only hook to reset module token cache between cases. */
+export function resetDropboxTokenCacheForTests(): void {
+  dropboxTokenCache = undefined;
+}
 
 export interface ResolvedResource {
   /** Raw bytes to send to the paying client. */
@@ -166,6 +187,168 @@ function googleDriveUrl(fileId: string): string {
   )}&export=download`;
 }
 
+/**
+ * Parse + validate a Dropbox URL for Mode A link-share access.
+ * Accepts both dropbox.com share URLs and direct dl.dropboxusercontent.com URLs.
+ */
+export function parseDropboxShareUrl(input: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(input.trim());
+  } catch {
+    throw new Error(`Invalid Dropbox URL: ${input}`);
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`Only https:// Dropbox URLs are allowed (got ${parsed.protocol}).`);
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (!DROPBOX_HOSTS.has(host)) {
+    throw new Error(`Unexpected Dropbox host: ${host}`);
+  }
+
+  return parsed;
+}
+
+/** Force Dropbox share links to the raw download variant. */
+export function rewriteDropboxShareUrl(input: string): string {
+  const parsed = parseDropboxShareUrl(input);
+  const host = parsed.hostname.toLowerCase();
+
+  // Force raw download for regular share links.
+  if (host === 'www.dropbox.com') {
+    parsed.searchParams.set('dl', '1');
+  }
+
+  return parsed.toString();
+}
+
+function parseDropboxPath(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    throw new Error('Dropbox path cannot be empty.');
+  }
+  if (!trimmed.startsWith('/')) {
+    throw new Error(`Dropbox path must start with "/" (got "${trimmed}").`);
+  }
+  return trimmed;
+}
+
+function hasDropboxOauthConfig(): boolean {
+  const { appKey, appSecret, refreshToken } = getDropboxOauthEnv();
+  return Boolean(appKey && appSecret && refreshToken);
+}
+
+function getDropboxOauthEnv(): {
+  appKey: string;
+  appSecret: string;
+  refreshToken: string;
+} {
+  return {
+    appKey: (process.env.DROPBOX_APP_KEY ?? '').trim(),
+    appSecret: (process.env.DROPBOX_APP_SECRET ?? '').trim(),
+    refreshToken: (process.env.DROPBOX_REFRESH_TOKEN ?? '').trim(),
+  };
+}
+
+async function refreshDropboxAccessToken(): Promise<string> {
+  if (!hasDropboxOauthConfig()) {
+    throw new Error(
+      'Dropbox OAuth is not configured. Set DROPBOX_APP_KEY, DROPBOX_APP_SECRET, and DROPBOX_REFRESH_TOKEN.',
+    );
+  }
+
+  const env = getDropboxOauthEnv();
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: env.refreshToken,
+    client_id: env.appKey,
+    client_secret: env.appSecret,
+  });
+
+  const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Dropbox token refresh failed: ${res.status} ${res.statusText}`);
+  }
+
+  const payload = (await res.json()) as { access_token?: string; expires_in?: number };
+  if (!payload.access_token || !payload.expires_in) {
+    throw new Error('Dropbox token refresh response was missing access_token or expires_in.');
+  }
+
+  dropboxTokenCache = {
+    accessToken: payload.access_token,
+    expiresAtMs: Date.now() + payload.expires_in * 1000,
+  };
+  return payload.access_token;
+}
+
+async function getDropboxAccessToken(): Promise<string> {
+  if (
+    dropboxTokenCache &&
+    Date.now() < dropboxTokenCache.expiresAtMs - DROPBOX_TOKEN_REFRESH_SKEW_MS
+  ) {
+    return dropboxTokenCache.accessToken;
+  }
+  return refreshDropboxAccessToken();
+}
+
+async function fetchDropboxPathBytes(
+  dropboxPath: string,
+): Promise<{ buffer: Buffer; contentType?: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const request = async (token: string): Promise<Response> =>
+    fetch('https://content.dropboxapi.com/2/files/download', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Dropbox-API-Arg': JSON.stringify({ path: dropboxPath }),
+      },
+    });
+  try {
+    let res = await request(await getDropboxAccessToken());
+    if (res.status === 401) {
+      // Retry once with a fresh token in case our cache expired early.
+      dropboxTokenCache = undefined;
+      res = await request(await refreshDropboxAccessToken());
+    }
+    if (!res.ok) {
+      throw new Error(`Dropbox source responded ${res.status} ${res.statusText}`);
+    }
+
+    const declaredLength = Number(res.headers.get('content-length') ?? '0');
+    if (declaredLength && declaredLength > MAX_REMOTE_BYTES) {
+      throw new Error(
+        `Dropbox source is ${declaredLength} bytes, over the ${MAX_REMOTE_BYTES}-byte limit.`,
+      );
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.byteLength > MAX_REMOTE_BYTES) {
+      throw new Error(
+        `Dropbox source is ${buffer.byteLength} bytes, over the ${MAX_REMOTE_BYTES}-byte limit.`,
+      );
+    }
+
+    return { buffer, contentType: res.headers.get('content-type') ?? undefined };
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Dropbox source timed out after ${FETCH_TIMEOUT_MS}ms.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -243,6 +426,45 @@ export async function resolveResource(entry: DesignSystemEntry): Promise<Resolve
     };
   }
 
+  if (sourceType === 'dropbox') {
+    if (source?.share_url) {
+      const dropboxUrl = rewriteDropboxShareUrl(source.share_url);
+      const { buffer, contentType } = await fetchRemoteBytes(dropboxUrl, 'Dropbox source');
+      if ((contentType ?? '').includes('text/html')) {
+        throw new Error(
+          'Dropbox returned an HTML page, not the file bytes. Check that the file is shared ' +
+            '"Anyone with link", and verify the link is still valid.',
+        );
+      }
+      return {
+        buffer,
+        mimeType: entry.mime_type ?? contentType ?? defaultMimeFor(kind),
+        filename: entry.bundle_file ?? basenameFromUrl(dropboxUrl, fallbackName),
+        sourceType,
+      };
+    }
+
+    if (source?.dropbox_path) {
+      const dropboxPath = parseDropboxPath(source.dropbox_path);
+      const { buffer, contentType } = await fetchDropboxPathBytes(dropboxPath);
+      if ((contentType ?? '').includes('text/html')) {
+        throw new Error(
+          'Dropbox returned an HTML page, not the file bytes. Check that the file path is valid and accessible by the app.',
+        );
+      }
+      return {
+        buffer,
+        mimeType: entry.mime_type ?? contentType ?? defaultMimeFor(kind),
+        filename: entry.bundle_file ?? path.basename(dropboxPath) ?? fallbackName,
+        sourceType,
+      };
+    }
+
+    throw new Error(
+      `Entry "${entry.id}" has source.type=dropbox but no source.share_url or source.dropbox_path.`,
+    );
+  }
+
   throw new Error(`Unknown storage source type: ${String(sourceType)}`);
 }
 
@@ -255,6 +477,10 @@ export interface BuildSourceInput {
   url?: string;
   /** Google Drive file ID, if any. */
   gdriveId?: string;
+  /** Dropbox share URL for Mode A (link-share, no OAuth). */
+  dropboxUrl?: string;
+  /** Dropbox file path for Mode B (private-file OAuth). */
+  dropboxPath?: string;
   /** Resource kind, used to derive a sensible display filename. */
   kind: ResourceType;
   /** Entry slug, used as a last-resort display filename. */
@@ -287,15 +513,25 @@ export function parseGoogleDriveId(input: string): string {
 
 /**
  * Validate publisher inputs and build the `{ file, source }` pair to register.
- * Exactly one of file/url/gdriveId must be provided.
+ * Exactly one of file/url/gdriveId/dropboxUrl/dropboxPath must be provided.
  */
 export function buildSource(input: BuildSourceInput): BuiltSource {
-  const provided = [input.file, input.url, input.gdriveId].filter(Boolean);
+  const provided = [
+    input.file,
+    input.url,
+    input.gdriveId,
+    input.dropboxUrl,
+    input.dropboxPath,
+  ].filter(Boolean);
   if (provided.length === 0) {
-    throw new Error('Provide one source: --file, --url, or --gdrive-id.');
+    throw new Error(
+      'Provide one source: --file, --url, --gdrive-id, --dropbox-url, or --dropbox-path.',
+    );
   }
   if (provided.length > 1) {
-    throw new Error('Provide only one source: --file, --url, or --gdrive-id.');
+    throw new Error(
+      'Provide only one source: --file, --url, --gdrive-id, --dropbox-url, or --dropbox-path.',
+    );
   }
 
   const ext = input.kind === 'bundle_zip' ? 'zip' : 'md';
@@ -319,6 +555,22 @@ export function buildSource(input: BuildSourceInput): BuiltSource {
     };
   }
 
+  if (input.dropboxUrl) {
+    parseDropboxShareUrl(input.dropboxUrl);
+    return {
+      file: basenameFromUrl(input.dropboxUrl, `${input.id}.${ext}`),
+      source: { type: 'dropbox', share_url: input.dropboxUrl.trim() },
+    };
+  }
+
+  if (input.dropboxPath) {
+    const dropboxPath = parseDropboxPath(input.dropboxPath);
+    return {
+      file: path.basename(dropboxPath) || `${input.id}.${ext}`,
+      source: { type: 'dropbox', dropbox_path: dropboxPath },
+    };
+  }
+
   // Local file — caller validates existence.
   return { file: path.basename(input.file as string) };
 }
@@ -328,10 +580,12 @@ export function storageStatus(): {
   local: boolean;
   url: boolean;
   google_drive: { enabled: boolean; api_key: boolean };
+  dropbox: { enabled: boolean; oauth: boolean };
 } {
   return {
     local: true,
     url: true,
     google_drive: { enabled: true, api_key: Boolean(GOOGLE_API_KEY) },
+    dropbox: { enabled: true, oauth: hasDropboxOauthConfig() },
   };
 }

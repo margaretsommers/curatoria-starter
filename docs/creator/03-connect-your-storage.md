@@ -1,11 +1,11 @@
 # Connect Your Storage
 
-> **Available today:** yes (local folder, your-domain URL, Google Drive)
+> **Available today:** yes (local folder, your-domain URL, Google Drive, Dropbox Mode A link-share, Dropbox Mode B with OAuth creds)
 > **Requires terminal:** yes
 
-Curatoria can sell a product whose bytes live in one of three places. You pick the
+Curatoria can sell a product whose bytes live in one of four places. You pick the
 source per product when you publish it. Only catalog metadata (name, price, tags)
-ever lives in your repo — for URL and Google Drive sources, the file itself stays
+ever lives in your repo — for URL, Google Drive, and Dropbox sources, the file itself stays
 where it is and is fetched on demand only after a buyer pays.
 
 | Source | Use it when | Config needed |
@@ -13,8 +13,9 @@ where it is and is fetched on demand only after a buyer pays.
 | **Local folder** | The file is small and you are happy to commit it | None |
 | **Your domain / URL** | You already host files on your site, a CDN, or object storage | None |
 | **Google Drive** | Your work already lives in Drive | None for public files; optional `GOOGLE_API_KEY` for private/large files |
+| **Dropbox** | You want link-share now (Mode A) or private-file access (Mode B) | Mode A: none. Mode B: `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN` |
 
-All three are available today and use the same `npm run publish-design` and
+All source options above are available today and use the same `npm run publish-design` and
 `npm run publish-pack` commands — you just swap which source flag you pass.
 
 ## Option A — Local folder (default)
@@ -110,9 +111,84 @@ connector is active at `GET /health` — look for
 > confirmation page instead of bytes. Curatoria detects this and returns a clear
 > error telling you to make the file link-shareable or set `GOOGLE_API_KEY`.
 
+## Option D — Dropbox (Mode A link-share + Mode B OAuth/private path)
+
+Dropbox Mode A works with a normal share link and does not require API keys.
+Publish with `--dropbox-url`:
+
+```bash
+npm run publish-design -- \
+  --id your-dropbox-doc \
+  --dropbox-url "https://www.dropbox.com/s/abc123/your-doc.md?dl=0" \
+  --name "Your Dropbox Doc" \
+  --price 0.05
+```
+
+```bash
+npm run publish-pack -- \
+  --id your-dropbox-pack \
+  --dropbox-url "https://www.dropbox.com/s/abc123/your-pack.zip?dl=0" \
+  --name "Your Dropbox Pack" \
+  --price 0.10
+```
+
+Curatoria validates Dropbox hosts and rewrites share links from `?dl=0` to
+`?dl=1` at fetch time so paid buyers receive file bytes directly.
+
+### Mode B (private files with OAuth)
+
+If you cannot use public share links, publish a Dropbox file path instead:
+
+```bash
+npm run publish-design -- \
+  --id your-dropbox-private-doc \
+  --dropbox-path "/Design Systems/your-doc.md" \
+  --name "Your Private Dropbox Doc" \
+  --price 0.05
+```
+
+```bash
+npm run publish-pack -- \
+  --id your-dropbox-private-pack \
+  --dropbox-path "/Design Systems/your-pack.zip" \
+  --name "Your Private Dropbox Pack" \
+  --price 0.10
+```
+
+Set these env vars in `.env` before using `--dropbox-path`:
+
+```bash
+DROPBOX_APP_KEY=...
+DROPBOX_APP_SECRET=...
+DROPBOX_REFRESH_TOKEN=...
+```
+
+One-time setup to get `DROPBOX_REFRESH_TOKEN`:
+
+1. In Dropbox App Console, create a scoped app and enable scopes:
+   `files.content.read` and `files.metadata.read`.
+2. In app settings, add redirect URI `http://localhost:53682/callback`.
+3. Open this URL in your browser (replace `YOUR_APP_KEY`):
+   `https://www.dropbox.com/oauth2/authorize?client_id=YOUR_APP_KEY&response_type=code&token_access_type=offline&redirect_uri=http://localhost:53682/callback`
+4. After approving, copy the `code=` value from the callback URL.
+5. Exchange the code for a refresh token:
+
+```bash
+curl https://api.dropboxapi.com/oauth2/token \
+  -d code=PASTE_AUTH_CODE_HERE \
+  -d grant_type=authorization_code \
+  -d client_id=YOUR_APP_KEY \
+  -d client_secret=YOUR_APP_SECRET \
+  -d redirect_uri=http://localhost:53682/callback
+```
+
+6. Copy `refresh_token` from the JSON response into `DROPBOX_REFRESH_TOKEN`.
+
+On `/health`, Mode B is active when you see `storage.dropbox.oauth: true`.
+
 ## How publishing records the source
 
-Each command writes one entry to `design-systems/.registry.json`. A URL or Drive
+Each command writes one entry to `design-systems/.registry.json`. A URL, Drive, or Dropbox
 product stores a small `source` block instead of a committed file:
 
 ```json
@@ -138,18 +214,76 @@ After publishing, regardless of source:
 2. `GET /design-systems/<id>` (or `/packs/<id>/download`) returns **402** when
    unpaid.
 3. After a successful x402 payment, the same route returns the file bytes. The
-   response carries an `X-Storage-Source` header (`local`, `url`, or `gdrive`) so
+   response carries an `X-Storage-Source` header (`local`, `url`, `gdrive`, or `dropbox`) so
    you can confirm which connector served it.
+
+## Why not iCloud API yet?
+
+iCloud is the obvious question for macOS creators, so here is the honest answer.
+
+### What works today (macOS symlink workaround)
+
+iCloud Drive syncs files to your Mac's local filesystem. You can sell them right
+now using the **local folder** connector — no iCloud API needed:
+
+1. In Finder, right-click your iCloud file and choose **Keep Downloaded** so
+   macOS ensures the file is on disk (not a placeholder).
+2. Symlink it into `design-systems/`:
+
+```bash
+ln -s ~/Library/Mobile\ Documents/com~apple~CloudDocs/my-system.md \
+  design-systems/my-system.md
+```
+
+3. Publish with `--file design-systems/my-system.md`.
+
+Windows creators using iCloud for Windows can do the same: find your iCloud sync
+folder under `C:\Users\<you>\iCloudDrive\` (or wherever iCloud installed it) and
+symlink or copy the file into `design-systems/`.
+
+**What to watch:** if you move the file in iCloud, the symlink breaks. Keep the
+file in the same iCloud location, or re-symlink after moving.
+
+### Why public iCloud share links do not work
+
+When you right-click a file in iCloud Drive and click **Share → Copy Link**, what
+you get is an `icloud.com` web page — not a direct file download URL. Those links
+open a preview in a browser; they cannot be fetched as raw bytes by a server. That
+is why Curatoria cannot support them the same way it supports Dropbox or Google
+Drive share links.
+
+### What full iCloud API (CloudKit) would actually require
+
+A proper server-side iCloud connector would use Apple's **CloudKit** or the
+**CloudKit Web Services** API. Here is what that entails:
+
+| Requirement | Details |
+| --- | --- |
+| **Apple Developer Program** | $99/year membership, required to access CloudKit server-to-server APIs |
+| **Server-to-server auth keys** | A per-app EC private key generated in App Store Connect; each creator would need to create their own app record |
+| **Per-creator container setup** | Each creator's files live in their own iCloud container; there is no shared "grant Curatoria read access" OAuth flow like Dropbox or Google Drive |
+| **Apple-platform restriction** | CloudKit Web Services is designed for apps already in the Apple ecosystem; it is not a general-purpose cloud storage API |
+| **Zero public download primitive** | CloudKit has no concept of a signed public download URL equivalent to `dl=1` (Dropbox) or `alt=media` (Google Drive); every fetch requires authenticated API calls |
+
+In short: every creator would need their own Apple Developer account, their own
+CloudKit container, and Curatoria would need to manage per-creator key pairs. That
+is significantly more setup friction than Google Drive or Dropbox.
+
+### When full iCloud API support might arrive
+
+Curatoria will build a proper CloudKit connector when creator demand clearly
+justifies the setup cost. The symlink workaround covers most macOS-first workflows
+in the meantime. If you need CloudKit support, email the interest list so it gets
+weighted in the roadmap.
 
 ## Still planned
 
 These are not built yet:
 
-- **Dropbox and iCloud** connectors;
+- full **iCloud CloudKit** connector (see above for why it's deferred);
 - **OAuth-based** Drive access for files you do not want to make link-shareable
   and cannot cover with a single API key;
 - a **browser UI** for picking files and setting prices (no terminal);
 - automatic upload to object storage from within Curatoria.
 
-Until those land, the three sources above — local, URL, and Google Drive — are the
-supported ways to connect storage.
+Until those land, the supported storage paths are local, URL, Google Drive, and Dropbox.

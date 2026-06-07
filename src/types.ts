@@ -7,12 +7,13 @@ export type ResourceType = 'design_md' | 'bundle_zip';
  *
  *   local  — a file inside the repo's design-systems/ directory (default)
  *   url    — a direct https:// URL you control (your domain, a CDN, object storage)
- *   gdrive — a Google Drive file shared as "Anyone with the link can view"
+ *   gdrive  — a Google Drive file shared as "Anyone with the link can view"
+ *   dropbox — a Dropbox shared link (Mode A) or private path (Mode B OAuth)
  *
- * Only registry metadata (price, name, tags) is ever stored locally for url/gdrive
+ * Only registry metadata (price, name, tags) is ever stored locally for url/gdrive/dropbox
  * sources; the bytes are fetched on demand after a successful x402 payment.
  */
-export type StorageSourceType = 'local' | 'url' | 'gdrive';
+export type StorageSourceType = 'local' | 'url' | 'gdrive' | 'dropbox';
 
 export interface EntrySource {
   /** Connector kind. Defaults to 'local' when omitted. */
@@ -21,6 +22,10 @@ export interface EntrySource {
   url?: string;
   /** Google Drive file ID for type 'gdrive' (the long token in the share link). */
   file_id?: string;
+  /** Dropbox share URL for type 'dropbox' (Mode A: link-share). */
+  share_url?: string;
+  /** Dropbox file path for type 'dropbox' (Mode B OAuth/private-file access). */
+  dropbox_path?: string;
 }
 
 export interface DesignSystemEntry {
