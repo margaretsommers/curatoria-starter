@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5efe3" />
+    <title>Docs - Curatoria Starter</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="topbar" aria-label="Primary navigation">
+        <a class="brand" href="./docs.html">Curatoria Starter</a>
+        <div class="nav-links">
+          <a href="./docs.html" aria-current="page">Docs</a>
+          <a href="https://github.com/margaretsommers/curatoria-starter" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </nav>
+
+      <article class="panel docs">
+        <header class="docs-header">
+          <p class="eyebrow">Creator guide</p>
+          <h1>Set up your own x402 design catalog.</h1>
+          <p class="lede">
+            Start with the local chapters in <code>docs/creator/</code>. The starter service is meant
+            to be linked from your own site.
+          </p>
+        </header>
+
+        <section class="callout" aria-labelledby="start-here">
+          <h2 id="start-here">Start here</h2>
+          <p>
+            <strong>Available today:</strong> clone curatoria-starter, connect a payout wallet,
+            run the Node service, test the demo Markdown and bundle routes, then replace the
+            demo files with your own products.
+          </p>
+          <p>
+            <strong>Coming soon:</strong> no-terminal publishing, more hosted storage connectors,
+            and stronger external Bazaar indexing guarantees.
+          </p>
+        </section>
+
+        <section class="docs-section">
+          <h2>Setup chapters</h2>
+          <ul class="link-list">
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/00-readme.md" target="_blank" rel="noreferrer">Start here</a><span>Understand what is available today.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/01-before-you-start.md" target="_blank" rel="noreferrer">Before you start</a><span>x402, catalogs, and how agents pay for files.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/02-wallet-basics.md" target="_blank" rel="noreferrer">Wallet basics</a><span>Set a public Base-compatible payout address.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/03-connect-your-storage.md" target="_blank" rel="noreferrer">Connect your storage</a><span>Use local files, direct URLs, Google Drive, or supported Dropbox paths.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/04-products-and-prices.md" target="_blank" rel="noreferrer">Products and prices</a><span>Add Markdown products and zip bundles.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/05-markdown-vs-bundle.md" target="_blank" rel="noreferrer">Markdown vs bundle</a><span>Choose the right product format.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/06-test-on-testnet.md" target="_blank" rel="noreferrer">Test on testnet</a><span>Run bug-bash, unpaid 402 checks, and optional paid proof.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/07-go-live.md" target="_blank" rel="noreferrer">Go live</a><span>Switch to Base mainnet only after testnet is green.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/08-bazaar-listing.md" target="_blank" rel="noreferrer">Bazaar listing</a><span>Built-in 402 metadata plus manual catalog sharing.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/09-troubleshooting.md" target="_blank" rel="noreferrer">Troubleshooting</a><span>Common startup, catalog, 402, payment, and delivery problems.</span></li>
+            <li><a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/creator/appendix-self-host.md" target="_blank" rel="noreferrer">Advanced self-hosting</a><span>Railway, Fly, Render, VMs, DNS, and production checks.</span></li>
+          </ul>
+        </section>
+
+        <section class="docs-section">
+          <h2>What works in this starter</h2>
+          <ol class="steps">
+            <li>Well-known returns the free full catalog — <code>design_systems[]</code> with names, prices, and <code>access_url</code> (no storage paths).</li>
+            <li><code>GET /catalog</code> is a free alias of the same listing.</li>
+            <li>Protected asset routes return <code>402</code> until payment; then markdown or zip bytes.</li>
+            <li>Each paid route declares Bazaar discovery metadata automatically in <code>402</code> challenges.</li>
+            <li>Local files under <code>design-systems/</code> are the simplest source of truth today.</li>
+            <li>External Bazaar indexing still depends on third-party directories finding your catalog URL.</li>
+          </ol>
+        </section>
+
+        <footer class="footer">
+          <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/docs/acceptable-use-and-content-ownership.md" target="_blank" rel="noreferrer">Acceptable use and content ownership</a>
+        </footer>
+      </article>
+    </main>
+  </body>
+</html>

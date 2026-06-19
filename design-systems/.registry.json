@@ -1,0 +1,45 @@
+{
+  "owner": {
+    "wallet": "0x0000000000000000000000000000000000000001",
+    "name": "Your Name",
+    "url": "https://yourdomain.com",
+    "catalog_price_usd": "0.001"
+  },
+  "design_systems": [
+    {
+      "id": "example-minimal",
+      "file": "example-minimal.md",
+      "name": "Minimal SaaS Design System",
+      "description": "A small example product you can replace with your own design resource.",
+      "price_usd": "0.01",
+      "tags": ["starter", "example", "design-system"],
+      "published_at": "2026-05-08T00:00:00Z",
+      "active": true
+    },
+    {
+      "id": "curatoria-demo-md",
+      "file": "curatoria-demo-md.md",
+      "resource_type": "design_md",
+      "mime_type": "text/markdown",
+      "name": "Curatoria Demo Markdown",
+      "description": "A generic paid markdown proof fixture for testing x402 catalog delivery.",
+      "price_usd": "0.01",
+      "tags": ["starter", "demo", "markdown", "x402"],
+      "published_at": "2026-06-17T00:00:00Z",
+      "active": true
+    },
+    {
+      "id": "curatoria-demo-pack",
+      "file": "curatoria-demo-pack.zip",
+      "resource_type": "bundle_zip",
+      "bundle_file": "curatoria-demo-pack.zip",
+      "mime_type": "application/zip",
+      "name": "Curatoria Demo Pack",
+      "description": "A tiny paid zip proof fixture for testing x402 bundle delivery.",
+      "price_usd": "0.03",
+      "tags": ["starter", "demo", "bundle", "x402"],
+      "published_at": "2026-06-17T00:00:00Z",
+      "active": true
+    }
+  ]
+}

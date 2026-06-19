@@ -1,0 +1,10 @@
+{
+  "name": "@curatoria/site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Curatoria landing site workspace",
+  "scripts": {
+    "dev": "node serve.mjs",
+    "start": "node serve.mjs"
+  }
+}
