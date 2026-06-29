@@ -5,6 +5,24 @@
 
 Before you clone the starter or run your first smoke test, it helps to know what you are wiring together and in what order. This chapter is the detailed reference for accounts, environment variables, and deployment choices. For a short ordered checklist, start with [`00-happy-path.md`](00-happy-path.md).
 
+## Account Preflight
+
+Do this account and access work before you start timing the starter install. The starter is small, but a real creator setup depends on accounts outside the repo.
+
+| Need | Required for | Track A default | Track B optional | What to have ready |
+| --- | --- | --- | --- | --- |
+| **GitHub account** | Clone, template repo, host deploy connection | Yes | Yes | Access to create a repo from [`curatoria-starter`](https://github.com/margaretsommers/curatoria-starter) and connect it to your host |
+| **Managed Node host** | Public HTTPS deployment | Yes for launch | Yes for launch | Vercel is the reference path; Railway, Fly.io, Render, or a VPS can work if you set env vars and run `npm run build` + `npm run start` |
+| **Railway account** | Only if you choose Railway as the host | No if using Vercel or another host | Same | Railway project access, billing/trial status understood, repo connected, and a public service URL or custom domain planned |
+| **Payout wallet on Base** | Local server start, `402` challenges, settlement destination | Yes | Yes | A dedicated EVM receive address for `WALLET_ADDRESS`; use Base Sepolia for testnet and Base mainnet only when ready |
+| **Base Sepolia test funds** | Optional paid testnet proof | Not needed for unpaid smoke; needed for paid proof | Same | Test ETH from CDP faucet and test USDC from Circle faucet, plus an x402-capable buyer wallet if you run paid proof |
+| **Coinbase Developer Platform (CDP)** | Mainnet facilitator auth and testnet faucet access | Faucet optional on testnet; API keys required for mainnet | Same | CDP portal access; for mainnet, `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` with x402 facilitator permissions |
+| **Storage provider** | Production products beyond demo files | Optional for first local run | Same | Local files work first. For production, have Google Drive/Dropbox/HTTPS file access and sharing/API credentials ready if needed |
+| **Domain / DNS** | Stable public catalog URL | Recommended for launch | Recommended for launch | Domain or host subdomain for `PUBLIC_BASE_URL`; custom DNS before broad sharing |
+| **Admin secret owner** | Publish/admin routes | Yes | Yes | A long random `ADMIN_API_KEY`, stored in `.env` locally and host secrets in production |
+
+For the first local Track A run, the shortest real preflight is: GitHub access, Node/npm installed, a Base-compatible payout address, and a generated `ADMIN_API_KEY`. Railway, CDP mainnet keys, paid buyer-wallet setup, custom domain, and production storage can wait until deploy/testnet/mainnet steps.
+
 ## Overview
 
 Curatoria is a small Node.js service that sells your digital products to AI agents with [x402](https://docs.x402.org). You host the service, point a domain at it, and keep your product files in storage you control.
@@ -131,12 +149,12 @@ Point DNS to your host per their docs, then set `PUBLIC_BASE_URL=https://yourdom
 
 | | |
 | --- | --- |
-| **What for** | **Not used by the Curatoria reference deployment.** Railway appears in docs only as one of several managed Node hosts you *can* use. |
+| **What for** | Optional managed Node hosting. Choose Railway only if you want it instead of the Vercel reference path or another host. |
 | **Signup** | [railway.app](https://railway.app) |
 | **Free tier** | Limited trial/credits; good for long-running Node processes if you prefer Railway over Vercel serverless. |
-| **When** | Optional alternative to Vercel, Fly.io, or Render — see [`appendix-self-host.md`](appendix-self-host.md). |
+| **When** | Before deploy if Railway is your chosen host; not needed for local smoke or if you deploy on Vercel/Fly/Render — see [`appendix-self-host.md`](appendix-self-host.md). |
 
-There is no Railway config file in the starter repo. If you choose Railway, connect the repo, set the same env vars as Vercel, use `npm run build` + `npm run start`, and set `PUBLIC_BASE_URL` to your Railway public URL or custom domain.
+There is no Railway config file in the starter repo. If you choose Railway, create a Railway project, connect your GitHub repo, confirm the account has active trial/billing capacity, set the same env vars as Vercel, use `npm run build` + `npm run start`, and set `PUBLIC_BASE_URL` to your Railway public URL or custom domain.
 
 ### Google Drive / Dropbox (storage — not a Curatoria account)
 

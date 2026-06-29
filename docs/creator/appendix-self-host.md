@@ -45,6 +45,8 @@ Use any host that can run a Node app:
 | VPS or EC2 | More control, more operations responsibility. |
 | Container host | Useful when you already deploy containerized services. |
 
+Railway is optional, not required by Curatoria. If you choose it, create the Railway account/project before the deploy step, connect your GitHub repo, confirm trial or billing capacity, set the same environment variables listed below, and use the Railway-provided public URL or your custom domain as `PUBLIC_BASE_URL`.
+
 Set the host's start command to:
 
 ```bash

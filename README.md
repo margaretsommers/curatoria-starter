@@ -14,6 +14,8 @@ Curatoria Starter is a template for selling original design resources through an
 
 ## Quick Start
 
+Before timing the install, finish the account preflight in `docs/creator/00-accounts-and-env.md`. The first local Track A run needs GitHub access, Node/npm, a Base-compatible payout wallet address, and a generated `ADMIN_API_KEY`. Deploy/mainnet may add Vercel or Railway, DNS, CDP keys, testnet funding, and storage-provider setup.
+
 1. Use this repository as a GitHub template, then clone your new repo.
 2. Install dependencies:
 
@@ -100,7 +102,7 @@ Optional Track B: set `CATALOG_PAYWALL_ENABLED=1` for paid `/catalog` (see `docs
 
 ## Deploy
 
-Deploy the Node service to Railway, Fly, Render, or another host that supports long-running Node processes.
+Deploy the Node service to Vercel, Railway, Fly, Render, or another host that supports Node services. Vercel is the reference path in the creator docs. Railway is optional: create a Railway account/project first, connect the GitHub repo, confirm trial or billing capacity, set env vars in Railway, and use the Railway URL or custom domain as `PUBLIC_BASE_URL`.
 
 Set the same environment variables in your host dashboard, use `NETWORK=base` when you are ready for mainnet, and host the deployed service behind a domain or API subdomain you control. Agents discover your full catalog at the well-known URL:
 

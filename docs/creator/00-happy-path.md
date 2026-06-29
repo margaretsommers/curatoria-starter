@@ -7,6 +7,27 @@ Use this as the front door. Each step links to detail in [`00-accounts-and-env.m
 
 **Discovery track:** Default is **Track A** (free full catalog at well-known + paid assets). Optional **Track B** (`CATALOG_PAYWALL_ENABLED=1`): teaser → paid `/catalog` → paid assets. Comparison: [`01-before-you-start.md`](01-before-you-start.md).
 
+## Before You Start: Account Preflight
+
+Do this setup before you time or judge the starter install. The repo can be cloned quickly; account creation, hosting access, wallet funding, and DNS often take longer.
+
+For the first local Track A run, have ready:
+
+- GitHub access so you can create or fork the starter repo.
+- Node.js and npm on your machine.
+- A Base-compatible payout wallet address for `WALLET_ADDRESS`; Coinbase Wallet is recommended, but any EVM wallet that can receive USDC on Base works.
+- A long random `ADMIN_API_KEY` you generate and keep out of git.
+
+For deploy and launch, also plan for:
+
+- A managed Node host account. Vercel is the reference path; Railway is optional and requires a Railway account/project, repo connection, env vars, and an active trial or billing setup.
+- A public URL for `PUBLIC_BASE_URL` — either a host URL for testing or a custom domain before broad sharing.
+- Base Sepolia test funds only when you run optional paid proof: test ETH plus test USDC, and a funded buyer wallet/client if you use automated paid tests.
+- Coinbase Developer Platform only when needed: CDP faucet access can help on testnet; CDP API keys are required for Base mainnet facilitator auth.
+- Storage access when moving beyond demo files: local `design-systems/` first, then Google Drive public links or API key, Dropbox share links or OAuth credentials, or HTTPS files on your own domain.
+
+Full details: [Account Preflight](00-accounts-and-env.md#account-preflight).
+
 ## Checklist
 
 - [ ] **1. Clone the starter**
