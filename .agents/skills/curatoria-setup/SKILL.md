@@ -1,24 +1,24 @@
 ---
 name: curatoria-setup
-description: "End-to-end Curatoria starter setup for creators and technical users: detect skill level, choose Track A vs B, configure accounts and env, local smoke, publish products, testnet deploy (Vercel default), public-link storage, mainnet CDP gate, and catalog price config. Use when setting up curatoria-starter, selling design systems to AI agents, x402 paywall, Base Sepolia testnet, npm run bug-bash, npm run smoke, publish-design, publish-pack, Vercel deploy, or 'how do I set up Curatoria'. Triggers on curatoria-starter, creator setup, paywall service, go live on Base."
+description: "End-to-end Curatoria starter setup for creators: clone the public starter, configure env, run local dev, smoke, and bug-bash, then choose storage/deploy/mainnet only after the local Track A path is green. Use when setting up curatoria-starter, selling design systems to AI agents, x402 paywall, Base Sepolia testnet, npm run bug-bash, npm run smoke, publish-design, publish-pack, Vercel deploy, or 'how do I set up Curatoria'. Triggers on curatoria-starter, creator setup, paywall service, go live on Base."
 user-invocable: true
 disable-model-invocation: false
-allowed-tools: ["Bash(npm *)", "Bash(node *)", "Bash(curl *)", "Bash(cp *)", "Bash(mkdir *)", "Bash(npx vercel*)", "Read(docs/creator/*)"]
+allowed-tools: ["Bash(git clone *)", "Bash(npm *)", "Bash(node *)", "Bash(curl *)", "Bash(cp *)", "Bash(test *)", "Bash(npx vercel*)", "Read(docs/creator/*)"]
 ---
 
 # Curatoria Setup
 
-Guide a creator through the full curatoria-starter arc. Complete phases in order unless the user explicitly skips ahead.
+Guide a creator through the public `curatoria-starter` setup in six ordered phases. Complete phases in order unless the user explicitly skips ahead, and read the linked `docs/creator/` chapter before giving phase-specific instructions.
 
-**Simplicity rule:** One default path (Track A + Vercel + local demo files first). Offer Track B only when the user asks.
+**Default path:** Track A — free full catalog at `/.well-known/design-catalog.json` and `/catalog`, paid per asset. Mention Track B only as the optional paid-catalog mode after the Track A local proof is green.
 
-**Operator dogfood:** Before each starter export, operator agents run Phase 3 local smoke against a fresh `export-starter.sh` clone. If dogfood finds friction, fix operator first, then re-export.
+Creators should only need the public starter, their local terminal, and the creator docs in this repo.
 
-**Reference:** [`references/happy-path-checklist.md`](references/happy-path-checklist.md)
+**Happy-path reference:** `docs/creator/00-happy-path.md`.
 
 ---
 
-## Step 0 — Detect skill level
+## Step 0 — Calibrate Help Level
 
 Ask one question early:
 
@@ -29,54 +29,61 @@ Ask one question early:
 | **Normie** | Short sentences, run commands when they approve, state what each phase *proved*, avoid jargon (say "payment challenge" not "x402 v2 middleware") |
 | **Dev-comfortable** | Tighter steps, show curl/npm output, link to `docs/creator/` chapters, mention env var names |
 
----
-
-## Step 1 — Choose discovery track
-
-Offer both tracks with tradeoffs (from `docs/creator/01-before-you-start.md`). **Default: Track A.**
-
-| | **Track A — Free catalog (default)** | **Track B — Paid catalog (optional)** |
-| --- | --- | --- |
-| Well-known | Full product list free | Free teaser only (count + pointer) |
-| Catalog | Free full metadata (`/catalog` alias) | Paid `/catalog` per fetch (~$0.001 USDC) |
-| Assets | Paid per file | Paid per file |
-| Best for | Max discovery, demos; matches the starter default | Monetize discovery metadata |
-| Extra work | Works out of the box | Set `CATALOG_PAYWALL_ENABLED=1` |
-
-If unsure, recommend **Track A**. Track B is env-gated — document but do not enable unless asked.
+If the user is not ready to run shell commands, explain the phase and ask before executing.
 
 ---
 
-## Phase 1 — Prerequisites and accounts
+## Phase Map
 
-**Read:** `docs/creator/00-accounts-and-env.md` (accounts, dependency order, env table).
-
-Minimum accounts for happy path:
-
-| Account | When | Why |
+| Phase | Goal | Read first |
 | --- | --- | --- |
-| GitHub | Start | Template repo |
-| Payout wallet (Coinbase Wallet recommended) | Before `.env` | Receives USDC |
-| Vercel | Before testnet deploy | Default host |
-| CDP (portal.cdp.coinbase.com) | Mainnet only | Facilitator API keys |
+| 1 | Clone and install the starter | `docs/creator/00-happy-path.md`, `docs/creator/00-accounts-and-env.md` |
+| 2 | Configure local `.env` and payout wallet | `docs/creator/02-wallet-basics.md` |
+| 3 | Start local dev and verify Track A catalog | `docs/creator/06-test-on-testnet.md` |
+| 4 | Run smoke | `docs/creator/06-test-on-testnet.md` |
+| 5 | Run bug-bash and publish/storage checks | `docs/creator/04-products-and-prices.md`, `docs/creator/03-connect-your-storage.md` |
+| 6 | Deploy/mainnet readiness | `docs/creator/07-go-live.md`, `docs/creator/08-bazaar-listing.md` |
 
-**Human gate (RED):** User creates wallet, CDP keys, Vercel login. Never ask for seed phrases or private keys.
+Stop after any failed verification. Fix the local issue before moving forward.
 
-Preflight in repo root:
+---
+
+## Phase 1 — Clone And Install
+
+**Read:** `docs/creator/00-happy-path.md` steps 1-2 and `docs/creator/00-accounts-and-env.md`.
+
+Start from the public GitHub repo:
 
 ```bash
-ls package.json && npm install
+git clone https://github.com/margaretsommers/curatoria-starter.git
+cd curatoria-starter
+npm install
 test -f .env || cp .env.example .env
 ```
 
----
+Use the user's fork/template repo if they already created one, but keep the public starter as the source of truth.
 
-## Phase 2 — Environment
-
-Minimum `.env` for local testnet (repo root — `npm run dev` loads it automatically):
+**Verification command:**
 
 ```bash
-# Replace placeholder before accepting real payments (valid hex format required for npm run dev).
+npm run build
+```
+
+**Expected output:** TypeScript build completes with exit code 0.
+
+---
+
+## Phase 2 — Configure Environment
+
+**Read:** `docs/creator/02-wallet-basics.md` and the env table in `docs/creator/00-accounts-and-env.md`.
+
+AskQuestion gate before editing `.env`:
+
+> What Base-compatible payout wallet address should receive USDC, and are we staying on `base-sepolia` for local testing?
+
+Never ask for seed phrases, private keys, or recovery phrases. For local setup, `.env` lives at the repo root and should look like:
+
+```bash
 WALLET_ADDRESS=0x0000000000000000000000000000000000000001
 ADMIN_API_KEY=change-me-admin-key
 NETWORK=base-sepolia
@@ -84,43 +91,63 @@ PORT=3000
 FACILITATOR_URL=https://x402.org/facilitator
 ```
 
-**Read:** `docs/creator/02-wallet-basics.md`
+Replace the placeholder wallet with the creator's Base-compatible `0x...` payout address before accepting real payments. The placeholder is only for local smoke mechanics.
 
-Fund test wallet (testnet only):
+**Verification command:**
 
-- Base Sepolia ETH: [CDP Faucet](https://portal.cdp.coinbase.com/products/faucet)
-- Base Sepolia USDC: [Circle Faucet](https://faucet.circle.com/)
+```bash
+node -e "const fs=require('fs'); const env=fs.readFileSync('.env','utf8'); for (const key of ['WALLET_ADDRESS','ADMIN_API_KEY','NETWORK','FACILITATOR_URL']) { if (!env.includes(key + '=')) throw new Error('missing ' + key); } console.log('env ok')"
+```
 
-**Confidence builder:** After `npm run dev`, `curl http://localhost:3000/health` should show `status: ok`, `network: base-sepolia`, and their wallet.
+**Expected output:** `env ok`.
 
 ---
 
-## Phase 3 — Local smoke
+## Phase 3 — Start Local Dev
 
 ```bash
-npm run dev   # terminal A
-npm run smoke # terminal B
+npm run dev
 ```
 
-**Proves:** Service runs; free catalog at well-known with `design_systems[]`; demo asset routes return 402.
+In a second terminal:
 
-Optional deeper gate:
+```bash
+curl http://localhost:3000/health
+curl http://localhost:3000/.well-known/design-catalog.json
+curl http://localhost:3000/catalog
+```
+
+**Expected output:** `/health` includes `status: "ok"` and `network: "base-sepolia"`. The well-known catalog and `/catalog` return HTTP 200 with a `design_systems` array. This proves Track A is active.
+
+If `/catalog` returns 402, the user probably enabled optional Track B; unset `CATALOG_PAYWALL_ENABLED` and restart unless they intentionally asked for paid catalog discovery.
+
+---
+
+## Phase 4 — Smoke Test
+
+```bash
+npm run smoke
+```
+
+**Expected output:** Smoke exits 0 and reports health, catalog, and unpaid asset paywall checks as passing.
+
+If smoke fails, read `docs/creator/09-troubleshooting.md` before changing unrelated settings.
+
+---
+
+## Phase 5 — Bug-Bash And Product Proof
+
+**Read:** `docs/creator/06-test-on-testnet.md`. If the creator wants to add their own product before bug-bash, also read `docs/creator/04-products-and-prices.md`.
+
+Run the full local gate:
 
 ```bash
 npm run bug-bash -- --local
 ```
 
-**Proves:** Health + catalog + markdown/bundle 402 + Bazaar metadata in challenges.
+**Expected output:** Bug-bash exits 0. It should pass health, free catalog, unpaid Markdown 402, unpaid bundle 402, and Bazaar metadata checks.
 
-For Track B local dev only: `CATALOG_PAYWALL_ENABLED=1` (and optional `CATALOG_PAYWALL_BYPASS=1`) — **never in production unless intentional**.
-
-**Read:** `docs/creator/06-test-on-testnet.md`
-
----
-
-## Phase 4 — Publish a product (local demo)
-
-Starter ships demo products (`curatoria-demo-md`, `curatoria-demo-pack`). For a custom product:
+For custom products, publish with the CLI and re-run the catalog checks:
 
 ```bash
 npm run publish-design -- \
@@ -130,146 +157,64 @@ npm run publish-design -- \
   --price 0.05 \
   --desc "One sentence" \
   --tags design
-```
 
-Verify:
-
-```bash
-curl -s http://localhost:3000/.well-known/design-catalog.json | head
+curl http://localhost:3000/.well-known/design-catalog.json
 curl -v http://localhost:3000/design-systems/my-product
-# → 402 Payment Required
 ```
 
-**Proves:** Registry updated; catalog knows the product; paywall active.
+**Expected output:** The catalog includes `my-product`; the product route returns `402 Payment Required` when unpaid.
 
-**Read:** `docs/creator/04-products-and-prices.md`, `docs/creator/05-markdown-vs-bundle.md`
+Storage choices available today are local folder, HTTPS URL, Google Drive, Dropbox link-share, and Dropbox OAuth/private path. Read `docs/creator/03-connect-your-storage.md` before using `--url`, `--gdrive-id`, `--dropbox-url`, or `--dropbox-path`.
 
 ---
 
-## Phase 5 — Testnet deploy (Vercel default)
+## Phase 6 — Deploy And Mainnet Readiness
 
-**Default happy path:** Vercel + GitHub connect.
+**Read:** `docs/creator/07-go-live.md` and `docs/creator/08-bazaar-listing.md`.
 
-1. Push repo to user's GitHub (user approves).
-2. Import in Vercel; set env vars from `.env` (no `CATALOG_PAYWALL_BYPASS`).
-3. Deploy; set `PUBLIC_BASE_URL=https://yourdomain.com` when custom domain is ready.
+AskQuestion gate before any mainnet language:
 
-```bash
-npx vercel@latest --prod   # if user prefers CLI
-```
+> Are you ready to use real Base mainnet USDC, and do you have CDP facilitator API keys for this deployment?
 
-Verify production:
+If the answer is no, stay on `base-sepolia`. Do not run paid mainnet commands.
+
+For a public testnet deploy, set host env vars and verify:
 
 ```bash
 curl https://YOUR_DOMAIN/health
 curl https://YOUR_DOMAIN/.well-known/design-catalog.json
-curl https://YOUR_DOMAIN/catalog   # → 200 with design_systems[]
-curl -v https://YOUR_DOMAIN/design-systems/curatoria-demo-md   # → 402
+curl https://YOUR_DOMAIN/catalog
+curl -v https://YOUR_DOMAIN/design-systems/curatoria-demo-md
 ```
 
-**Human gate (RED):** Deploy approval if not pre-authorized; domain DNS; Vercel env secrets.
+**Expected output:** Health is ok, catalog endpoints return HTTP 200 with Track A metadata, and the demo asset route returns `402`.
 
-**Proves:** Public catalog returns 200 with product metadata; unpaid assets return 402.
-
-**Read:** `docs/creator/07-go-live.md` (testnet sections)
-
----
-
-## Phase 6 — Storage (public-link)
-
-Production path: files stay in creator storage; server fetches after payment.
-
-```bash
-# Google Drive — file shared "Anyone with the link can view"
-npm run publish-design -- --id my-doc --gdrive-id "<file-id-or-share-url>" \
-  --name "My Doc" --price 0.05
-
-# Dropbox share URL
-npm run publish-pack -- --id my-pack --dropbox-url "https://www.dropbox.com/s/.../file.zip?dl=0" \
-  --name "My Pack" --price 0.10
-
-# Direct HTTPS URL
-npm run publish-design -- --id my-doc --url "https://files.example.com/doc.md" \
-  --name "My Doc" --price 0.05
-```
-
-Local `design-systems/` files remain valid for demo and smoke — not required for production.
-
-**Proves:** Paid fetch returns bytes with `X-Storage-Source` header (not `local`) after optional paid test.
-
-**Read:** `docs/creator/03-connect-your-storage.md`
-
----
-
-## Phase 7 — Optional paid catalog (Track B)
-
-Only when user wants to monetize catalog discovery:
-
-- Env: `CATALOG_PAYWALL_ENABLED=1` and `CATALOG_PRICE_USD=0.001`
-- Or registry: `owner.catalog_price_usd` in `design-systems/.registry.json`
-
-Verify unpaid `/catalog` → 402; well-known switches to teaser.
-
-**Proves:** Two-tier discovery (optional advanced mode).
-
-**Read:** `docs/creator/04-products-and-prices.md`, `docs/creator/08-bazaar-listing.md`
-
----
-
-## Phase 8 — Mainnet + CDP (human pause)
-
-**Stop/go:** Do not flip to mainnet until testnet bug-bash is green.
-
-**Human gates (RED):**
-
-- CDP API key creation (`CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`)
-- Set `NETWORK=base`, `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402` on host
-- Small paid mainnet test (real USDC spend — user must approve)
-
-Preflight (no spend):
+Only after the user confirms mainnet readiness:
 
 ```bash
 curl -H "X-Admin-Key: $ADMIN_API_KEY" https://YOUR_DOMAIN/admin/facilitator-preflight
-# → ok: true
 ```
 
-Optional paid proof (user approves spend):
-
-```bash
-AWAL_PAID_TEST=1 npm run bug-bash -- --prod --paid
-```
-
-**Proves:** Facilitator green; at least one paid asset settles to payout wallet.
-
-**Read:** `docs/creator/07-go-live.md`
+**Expected output:** JSON includes `ok: true`. Optional paid proof requires explicit approval because it can spend real USDC.
 
 ---
 
-## Phase 9 — Bazaar discovery (Track A default)
+## Optional Track B — Paid Catalog
 
-On mainnet with CDP Facilitator, asset routes are **auto-indexed** after successful settlement. No separate Bazaar registration in Curatoria.
-
-**Track A (default):** Agents read `GET /.well-known/design-catalog.json` for free, then pay per asset. Bazaar metadata appears on unpaid asset `402` responses only.
-
-Verify locally (unpaid):
+Track B is advanced and optional. Use it only if the creator explicitly wants to monetize catalog discovery in addition to asset downloads.
 
 ```bash
-curl -v http://localhost:3000/design-systems/curatoria-demo-md   # → 402 + Bazaar extensions
+CATALOG_PAYWALL_ENABLED=1
+CATALOG_PRICE_USD=0.001
 ```
 
-After mainnet deploy + optional paid settlement:
+**Verification command:**
 
 ```bash
-npx awal@2.10.0 x402 bazaar search YOUR_DOMAIN
+curl -v http://localhost:3000/catalog
 ```
 
-**Notes:**
-
-- Indexing is asynchronous (hours). Absence after one settlement is normal.
-- If you previously ran Track B paid `/catalog`, Bazaar may show a stale catalog row after switching to Track A. Direct agents to well-known.
-- [Agentic.Market](https://agentic.market) surfaces Bazaar services automatically; featured placement is Coinbase discretion.
-
-**Read:** `docs/creator/08-bazaar-listing.md`
+**Expected output:** Unpaid `/catalog` returns `402`, while well-known switches to a teaser with a `paid_catalog_url`.
 
 ---
 
@@ -277,37 +222,38 @@ npx awal@2.10.0 x402 bazaar search YOUR_DOMAIN
 
 | Step | Gate | Color |
 | --- | --- | --- |
-| Wallet / CDP keys | User creates in browser | RED |
-| GitHub push | User account | RED |
-| Vercel deploy | User approves unless pre-authorized | RED |
+| Wallet address | User supplies payout address | RED |
+| GitHub/Vercel account actions | User signs in and approves | RED |
+| CDP keys | User creates and stores secrets | RED |
 | Mainnet USDC spend | Explicit approval | RED |
-| awal OTP | User authenticates buyer wallet | RED |
+| awal OTP | User authenticates buyer wallet only if paid proof is requested | RED |
 
-Agents run GREEN commands when user approves shell execution.
+Agents can run local GREEN commands after user approval. Never store secrets in chat or committed files.
 
 ---
 
-## Automation
+## Automation Contract
 
-When user approves, run commands via shell. After each phase, state **what was proven** in one line.
+After each phase, state one proof sentence:
 
 | Phase | Proof statement |
 | --- | --- |
-| Local smoke | "Free catalog at well-known; 402 on demo asset routes" |
+| Clone/install | "Dependencies install and build exits 0" |
+| Env | "Required env keys exist and network is base-sepolia" |
+| Local dev | "Health is ok and Track A catalog is free" |
+| Smoke | "Fast unpaid checks pass" |
 | Bug-bash | "Full local gate green including Bazaar metadata" |
-| Deploy | "Production catalog 200; unpaid assets 402" |
-| Storage | "Paid response served from gdrive/dropbox/url" |
-| Mainnet | "Facilitator preflight ok; paid settlement confirmed" |
-| Bazaar | "Asset routes in CDP index after mainnet settlement; well-known is free catalog entry" |
+| Deploy/mainnet | "Public catalog 200, unpaid assets 402, and preflight green before mainnet paid proof" |
 
 ---
 
 ## Shared rules
 
-- Never commit `.env`, private keys, or seed phrases.
+- Never commit `.env`, private keys, seed phrases, or recovery phrases.
 - Product IDs are permanent once shared.
 - Stay on `base-sepolia` until bug-bash passes.
-- Paid proof is opt-in — not required for normie success.
+- Paid proof is opt-in and can spend real money on mainnet.
+- Track A is default; Track B is optional and env-gated.
 - Troubleshooting: `docs/creator/09-troubleshooting.md`
 
 ---
