@@ -5,7 +5,7 @@
 
 Go live only after your Base Sepolia test flow works end to end. Mainnet uses the same app and routes, but payments settle in real USDC on Base.
 
-**Track A (default):** is the default for [curatoria.dev](https://curatoria.dev) and the starter export: free full catalog at well-known, paid assets only. **Track B** (`CATALOG_PAYWALL_ENABLED=1`): free teaser at well-known, paid `GET /catalog`, paid assets — see [`01-before-you-start.md`](01-before-you-start.md).
+**Track A (default):** is the starter default: free full catalog at well-known, paid assets only. **Track B** (`CATALOG_PAYWALL_ENABLED=1`): free teaser at well-known, paid `GET /catalog`, paid assets — see [`01-before-you-start.md`](01-before-you-start.md).
 
 ## Before You Switch
 

@@ -5,7 +5,7 @@
 
 Self-hosting gives you control over your domain, catalog, payout wallet, logs, and infrastructure. Today Curatoria is a Node service with local catalog and asset files. For heavier traffic, move secrets, files, monitoring, and rate limits into managed services.
 
-**Discovery tracks:** The shipped starter and [curatoria.dev](https://curatoria.dev) use **Track A** — free full catalog at well-known, paid assets only. **Track B** (`CATALOG_PAYWALL_ENABLED=1`) adds a paid `/catalog` listing. See [`01-before-you-start.md`](01-before-you-start.md).
+**Discovery tracks:** The shipped starter uses **Track A** — free full catalog at well-known, paid assets only. **Track B** (`CATALOG_PAYWALL_ENABLED=1`) adds a paid `/catalog` listing. See [`01-before-you-start.md`](01-before-you-start.md).
 
 ## Minimum Architecture
 

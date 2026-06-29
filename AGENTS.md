@@ -16,7 +16,7 @@ This repository is a public starter template for creators who want to sell origi
 - Private operator notes, strategy docs, or experiments
 - Real secrets, private keys, seed phrases, or `.env`
 - Personal production catalog content from another Curatoria deployment
-- Shopify experiments, waitlist tooling, operator `.agents/`, or `stash/`
+- Shopify experiments, waitlist tooling, operator agent folders, or archived operator material
 # Note: starter agent skills live in curatoria-starter/.agents/skills/ (e.g. curatoria-setup).
 # This script does NOT copy operator .agents/. Maintain starter skills directly in the starter repo.
 

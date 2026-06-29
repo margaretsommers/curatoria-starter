@@ -5,7 +5,7 @@
 
 Test on Base Sepolia before accepting real payments. The testnet flow uses the same Curatoria routes and x402 challenge pattern, but the ETH and USDC are faucet funds with no real value.
 
-Your smoke and bug-bash expectations depend on which discovery track you run. **Track A (free full catalog)** is the shipped default — [curatoria.dev](https://curatoria.dev) uses it. **Track B** (`CATALOG_PAYWALL_ENABLED=1`) changes well-known and `/catalog` behavior; see [`01-before-you-start.md`](01-before-you-start.md).
+Your smoke and bug-bash expectations depend on which discovery track you run. **Track A (free full catalog)** is the shipped default. **Track B** (`CATALOG_PAYWALL_ENABLED=1`) changes well-known and `/catalog` behavior; see [`01-before-you-start.md`](01-before-you-start.md).
 
 ## 1. Configure Testnet
 
@@ -19,7 +19,7 @@ PORT=3000
 FACILITATOR_URL=https://x402.org/facilitator
 ```
 
-**Track B (default)** — optional catalog price override:
+**Track B (optional)** — catalog price override:
 
 ```bash
 # CATALOG_PRICE_USD=0.001
@@ -191,10 +191,6 @@ AWAL_PAID_TEST=1 npm run bug-bash -- --local --paid
 ```
 
 On Track B, the paid bug-bash path pays for `/catalog` first, then for a demo asset. If authentication or balance is missing, the paid portion should skip and print the human next step instead of attempting payment. Keep buyer wallet signing material outside committed files.
-
-## Operator Reference
-
-[curatoria.dev](https://curatoria.dev) runs **Track A** in production: free full catalog at well-known, paid assets only.
 
 ## Stop/Go Checklist
 

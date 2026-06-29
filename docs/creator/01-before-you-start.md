@@ -5,7 +5,7 @@
 
 Curatoria is not a conventional checkout page. It is an agent-readable commerce service: the full catalog is exposed for free over HTTP, paid resources stay protected behind x402, and payment happens through `402 Payment Required` challenges.
 
-Before you publish your first product, choose how agents discover your catalog. Curatoria supports two tracks. The shipped starter and [curatoria.dev](https://curatoria.dev) default to **Track A** (free full catalog + paid assets). **Track B** (paid catalog listing) is an optional advanced mode when you want to monetize discovery metadata.
+Before you publish your first product, choose how agents discover your catalog. Curatoria supports two tracks. The shipped starter defaults to **Track A** (free full catalog + paid assets). **Track B** (paid catalog listing) is an optional advanced mode when you want to monetize discovery metadata.
 
 ## Two Discovery Tracks
 
@@ -17,13 +17,13 @@ Before you publish your first product, choose how agents discover your catalog. 
 | **Agent steps** | 1) Read well-known → 2) Pick product → 3) Pay for asset | 1) Read teaser → 2) Pay for `/catalog` → 3) Pick product → 4) Pay for asset |
 | **Revenue** | Asset sales only | Catalog access fee + asset sales |
 | **Complexity** | Lower — one free metadata hop | Higher — catalog paywall before asset paywall |
-| **When to choose** | Open catalogs, demos, maximum Bazaar visibility, curatoria.dev default | Monetize discovery, limit free scraping of full metadata |
+| **When to choose** | Open catalogs, demos, maximum Bazaar visibility, starter default | Monetize discovery, limit free scraping of full metadata |
 
 See [`00-accounts-and-env.md`](00-accounts-and-env.md) for env vars and [`03-connect-your-storage.md`](03-connect-your-storage.md) for how product payloads are fetched after payment.
 
 ### Track A — Free catalog (default)
 
-**curatoria.dev** and the starter ship Track A out of the box.
+The starter ships Track A out of the box.
 
 Agents read the full product listing for free at:
 

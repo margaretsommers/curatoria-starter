@@ -14,7 +14,7 @@ You are connecting four layers:
 | Layer | What it does | Where it lives |
 | --- | --- | --- |
 | **Paywall service** | Serves discovery, catalog, and paid routes; verifies x402 payments | Your deployed Node app (Vercel, Railway, Fly, VPS, etc.) |
-| **Discovery** | Free teaser at `/.well-known/design-catalog.json`; full metadata at paid `GET /catalog` | Same service |
+| **Discovery** | Track A default: free full catalog at `/.well-known/design-catalog.json` and `GET /catalog`; Track B optional: teaser + paid catalog | Same service |
 | **Storage** | Product bytes (markdown, zip) fetched only after payment | Local `design-systems/`, Google Drive, Dropbox, or HTTPS URL |
 | **Settlement** | x402 facilitator verifies and settles USDC on Base | Testnet: `x402.org`; mainnet: Coinbase CDP facilitator |
 
@@ -62,7 +62,7 @@ Numbered list (same sequence):
 11. **CDP account** (mainnet only) — API keys for the Coinbase x402 facilitator.
 12. **Mainnet env** — `NETWORK=base`, `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402`, `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`.
 13. **Facilitator preflight** — `GET /admin/facilitator-preflight` with `X-Admin-Key` returns `ok: true` (no USDC spent).
-14. **Catalog paywall config** — `CATALOG_PRICE_USD` or `owner.catalog_price_usd` in registry (see [`04-products-and-prices.md`](04-products-and-prices.md)); optional `CATALOG_PAYWALL_BYPASS=1` for local dev only.
+14. **Optional Track B catalog paywall config** — only if you intentionally enable `CATALOG_PAYWALL_ENABLED=1`: set `CATALOG_PRICE_USD` or `owner.catalog_price_usd` in registry (see [`04-products-and-prices.md`](04-products-and-prices.md)); optional `CATALOG_PAYWALL_BYPASS=1` for local dev only.
 
 Storage connectors (Google Drive, Dropbox, URL) can be added any time after local publish works — see [`03-connect-your-storage.md`](03-connect-your-storage.md).
 
@@ -107,7 +107,7 @@ Set `AWAL_PAID_TEST=1` only after awal is authenticated and the buyer wallet is 
 
 | | |
 | --- | --- |
-| **What for** | Hosting the Node service as serverless functions. The reference implementation at [curatoria.dev](https://curatoria.dev) runs on Vercel. |
+| **What for** | Hosting the Node service as serverless functions or a long-lived app. Vercel is the reference deployment path in this guide. |
 | **Signup** | [vercel.com](https://vercel.com) |
 | **Free tier** | Hobby tier works for early testing; set env vars in Project → Settings → Environment Variables. |
 | **When** | When you want a public HTTPS URL without managing a VM. |
@@ -175,8 +175,9 @@ Copy `.env.example` to `.env` locally. Never commit `.env`. Set the same variabl
 | `PUBLIC_BASE_URL` | Recommended for production | Your public `https://` origin | Absolute URLs in catalog JSON and x402 `resource.url` | Must be HTTPS in production |
 | `CDP_API_KEY_ID` | Mainnet facilitator | [CDP Portal](https://portal.cdp.coinbase.com) → API keys | Auth headers for Coinbase facilitator | Not needed for `x402.org` testnet path |
 | `CDP_API_KEY_SECRET` | Mainnet facilitator | Same CDP key creation flow | Paired secret for facilitator auth | Both ID and secret required; legacy `COINBASE_CDP_API_KEY` alone is not enough |
-| `CATALOG_PRICE_USD` | No (default `0.001`) | You choose (e.g. `0.001`) | Per-fetch x402 price for `GET /catalog` | Same unit: USDC dollars as decimal string |
-| `CATALOG_PAYWALL_BYPASS` | No | Set to `1` locally only | Skips catalog paywall middleware | **Local dev only** — never set in production |
+| `CATALOG_PAYWALL_ENABLED` | No | Set to `1` only if choosing Track B | Switches well-known to teaser and puts `GET /catalog` behind x402 | Optional advanced mode |
+| `CATALOG_PRICE_USD` | No (default `0.001` when Track B is enabled) | You choose (e.g. `0.001`) | Per-fetch x402 price for `GET /catalog` on Track B | Same unit: USDC dollars as decimal string |
+| `CATALOG_PAYWALL_BYPASS` | No | Set to `1` locally only | Skips Track B catalog paywall middleware | **Local dev only** — never set in production |
 | `AWAL_PAID_TEST` | No | Set to `1` when running paid bug-bash | Opt-in gate for spending test/mainnet USDC in scripts | Optional; see [`06-test-on-testnet.md`](06-test-on-testnet.md) |
 | `GOOGLE_API_KEY` | No | Google Cloud Console, Drive API enabled | Fetch private/large Drive files | Optional if files are public link-shared |
 | `STORAGE_MAX_BYTES` | No (default 50 MB) | You choose | Max remote file size for url/gdrive fetch | Same |
@@ -196,7 +197,7 @@ If you point mainnet at the CDP URL but omit keys, facilitator calls fail. If yo
 
 ### Catalog price resolution
 
-Catalog access fee resolves in order:
+If Track B is enabled, catalog access fee resolves in order:
 
 1. `CATALOG_PRICE_USD` env override (if set)
 2. `owner.catalog_price_usd` in `design-systems/.registry.json`
@@ -209,10 +210,10 @@ Catalog access fee resolves in order:
 | Clone, `npm install`, copy `.env.example` | **Easy** | ~10 minutes |
 | Set payout wallet + `ADMIN_API_KEY`, run `npm run dev` | **Easy** | Server validates wallet on startup |
 | Publish local demo products, `npm run smoke` | **Easy** | Unpaid 402 checks need no buyer wallet |
-| `npm run bug-bash -- --local` | **Easy–medium** | Two-tier catalog checks; use `CATALOG_PAYWALL_BYPASS=1` locally if you want full catalog JSON without paying |
+| `npm run bug-bash -- --local` | **Easy–medium** | Track A checks free catalog plus unpaid asset paywalls; Track B adds catalog 402 checks |
 | Fund testnet wallet (ETH + USDC) | **Medium** | Two faucets; confirm assets on Base Sepolia |
 | Deploy to Vercel + env vars | **Medium** | Familiar if you've deployed Node apps before |
-| Custom domain + `PUBLIC_BASE_URL` | **Medium** | DNS propagation; verify `base_url` in teaser JSON |
+| Custom domain + `PUBLIC_BASE_URL` | **Medium** | DNS propagation; verify `base_url` in catalog JSON |
 | Optional awal paid proof | **Medium–hard** | Buyer wallet auth, funding, `AWAL_PAID_TEST=1` |
 | Mainnet + CDP facilitator + preflight | **Harder** | API key permissions, `/admin/facilitator-preflight`, real USDC |
 | Google Drive / Dropbox production storage | **Medium** | Sharing settings and publish flags — config, not new code |
@@ -234,9 +235,9 @@ npm run dev
 npm run smoke
 ```
 
-You get: `/health`, free teaser at `/.well-known/design-catalog.json`, unpaid `402` on paid routes. No deploy, no CDP, no custom domain, no storage connectors.
+You get: `/health`, free full catalog at `/.well-known/design-catalog.json`, and unpaid `402` on paid asset routes. No deploy, no CDP, no custom domain, no storage connectors.
 
-Optional: `CATALOG_PAYWALL_BYPASS=1` to read full `/catalog` JSON locally without paying.
+Optional Track B: set `CATALOG_PAYWALL_ENABLED=1` to make well-known a teaser and require x402 for `GET /catalog`. `CATALOG_PAYWALL_BYPASS=1` is only for local Track B inspection without payment.
 
 ### Testnet path — public URL, fake money
 
@@ -259,7 +260,7 @@ Add to testnet:
 - `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402`
 - `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` in host secrets
 - Green `/admin/facilitator-preflight` before accepting buyer payments
-- `CATALOG_PRICE_USD` or registry `catalog_price_usd` set intentionally
+- Optional Track B only: `CATALOG_PRICE_USD` or registry `catalog_price_usd` set intentionally
 - Production storage (Drive/Dropbox/URL) with public-link or OAuth config
 - DMCA/support contact published (see [`07-go-live.md`](07-go-live.md))
 
@@ -303,11 +304,11 @@ Do not proceed to paid mainnet proof until preflight passes.
 curl -s https://yourdomain.com/.well-known/design-catalog.json | jq .paid_catalog_url
 ```
 
-### `/catalog` always 402 (expected) or never returns metadata after pay
+### `/catalog` returns 402
 
-**Symptoms:** Unpaid `/catalog` should return x402 `402` — that is correct. After payment, each new `GET /catalog` requires a **new** payment (per-fetch model, no session).
+**Symptoms:** On Track A, `/catalog` should return the same free full listing as well-known. On Track B (`CATALOG_PAYWALL_ENABLED=1`), unpaid `/catalog` should return x402 `402` — that is correct. After payment, each new Track B `GET /catalog` requires a **new** payment (per-fetch model, no session).
 
-**Fix:** If testing locally without paying, set `CATALOG_PAYWALL_BYPASS=1` in `.env` only. In production, agents must pay per catalog fetch. See [`08-bazaar-listing.md`](08-bazaar-listing.md).
+**Fix:** If you expected Track A, unset `CATALOG_PAYWALL_ENABLED` and restart. If you intentionally chose Track B and are testing locally without paying, set `CATALOG_PAYWALL_BYPASS=1` in `.env` only. In production Track B, agents must pay per catalog fetch. See [`08-bazaar-listing.md`](08-bazaar-listing.md).
 
 ### Google Drive file not found or 502 after payment
 

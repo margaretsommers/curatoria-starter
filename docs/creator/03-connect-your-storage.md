@@ -208,7 +208,7 @@ Local products keep their original shape (`file` points at a committed file, no
 
 ## Verify it works
 
-After publishing, regardless of source, confirm discovery and paywalls match your track. See [`01-before-you-start.md`](01-before-you-start.md). **Track A (default)** is what the starter and [curatoria.dev](https://curatoria.dev) ship.
+After publishing, regardless of source, confirm discovery and paywalls match your track. See [`01-before-you-start.md`](01-before-you-start.md). **Track A (default)** is what the starter ships.
 
 ### Track A — free full catalog (default)
 

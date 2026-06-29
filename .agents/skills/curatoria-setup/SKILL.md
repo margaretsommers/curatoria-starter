@@ -40,7 +40,7 @@ Offer both tracks with tradeoffs (from `docs/creator/01-before-you-start.md`). *
 | Well-known | Full product list free | Free teaser only (count + pointer) |
 | Catalog | Free full metadata (`/catalog` alias) | Paid `/catalog` per fetch (~$0.001 USDC) |
 | Assets | Paid per file | Paid per file |
-| Best for | Max discovery, demos; matches curatoria.dev | Monetize discovery metadata |
+| Best for | Max discovery, demos; matches the starter default | Monetize discovery metadata |
 | Extra work | Works out of the box | Set `CATALOG_PAYWALL_ENABLED=1` |
 
 If unsure, recommend **Track A**. Track B is env-gated — document but do not enable unless asked.
