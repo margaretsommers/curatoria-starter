@@ -184,8 +184,7 @@ export function x402Paywall(config: X402Config) {
       return;
     }
 
-    aliasXPaymentHeader(req);
-    officialMiddleware(req, res, next).catch(next);
+    invokeX402Middleware(officialMiddleware, req, res, next);
   };
 }
 
@@ -264,8 +263,7 @@ export function x402CatalogPaywall(config: X402CatalogConfig) {
       return;
     }
 
-    aliasXPaymentHeader(req);
-    officialMiddleware(req, res, next).catch(next);
+    invokeX402Middleware(officialMiddleware, req, res, next);
   };
 }
 
@@ -403,4 +401,28 @@ function aliasXPaymentHeader(req: Request): void {
   if (!req.headers['payment-signature'] && typeof xPayment === 'string') {
     req.headers['payment-signature'] = xPayment;
   }
+}
+
+function invokeX402Middleware(
+  officialMiddleware: ReturnType<typeof paymentMiddlewareFromHTTPServer>,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  aliasXPaymentHeader(req);
+  void officialMiddleware(req, res, (err?: unknown) => {
+    if (err) {
+      console.error(`x402 middleware error on ${req.method} ${req.path}:`, err);
+      if (!res.headersSent) {
+        res.status(503).json({ error: 'x402 payment service unavailable' });
+      }
+      return;
+    }
+    next();
+  }).catch((err: unknown) => {
+    console.error(`x402 middleware rejected on ${req.method} ${req.path}:`, err);
+    if (!res.headersSent) {
+      res.status(503).json({ error: 'x402 payment service unavailable' });
+    }
+  });
 }

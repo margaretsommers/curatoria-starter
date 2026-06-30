@@ -1,4 +1,4 @@
----
+ ---
 name: curatoria-setup
 description: "End-to-end Curatoria starter setup for creators: clone the public starter, configure env, run local dev, smoke, and bug-bash, then choose storage/deploy/mainnet only after the local Track A path is green. Use when setting up curatoria-starter, selling design systems to AI agents, x402 paywall, Base Sepolia testnet, npm run bug-bash, npm run smoke, publish-design, publish-pack, Vercel deploy, or 'how do I set up Curatoria'. Triggers on curatoria-starter, creator setup, paywall service, go live on Base."
 user-invocable: true

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { writeSitemapFile } from './sitemap';
 import { DesignCatalog, DesignSystemEntry } from './types';
 
 const REGISTRY_PATH = path.join(__dirname, '../design-systems/.registry.json');
@@ -61,6 +62,12 @@ export function appendEntry(entry: DesignSystemEntry): void {
     catalog.design_systems.push(entry);
   }
   fs.writeFileSync(REGISTRY_PATH, JSON.stringify(catalog, null, 2) + '\n');
+
+  try {
+    writeSitemapFile();
+  } catch (err) {
+    console.warn(`Failed to regenerate sitemap.xml: ${String(err)}`);
+  }
 }
 
 /**

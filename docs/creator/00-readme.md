@@ -62,6 +62,7 @@ An agent can walk a creator through the full setup in order. Point your agent at
 - `07-go-live.md` covers mainnet and deployment.
 - `08-bazaar-listing.md` explains built-in Bazaar metadata today and what external indexing still needs.
 - `09-troubleshooting.md` collects common failures.
+- `10-agent-readiness.md` covers agent discovery, x402 commerce signals, llms.txt, robots.txt, and optional WebMCP for scanners like isitagentready.com.
 
 ## Quick Start
 

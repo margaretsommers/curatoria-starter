@@ -4,6 +4,13 @@
  * Three route groups:
  *
  *   FREE    /.well-known/design-catalog.json  — full catalog (Track A default)
+ *           /.well-known/api-catalog           — RFC 9727 linkset discovery
+ *           /.well-known/openapi.json          — OpenAPI service description
+ *           /.well-known/oauth-authorization-server — RFC 8414 auth discovery
+ *           /.well-known/oauth-protected-resource   — RFC 9728 resource metadata
+ *           /.well-known/mcp/server-card.json       — MCP Server Card (SEP-1649)
+ *           /.well-known/agent-skills/index.json    — Agent Skills Discovery (RFC v0.2.0)
+ *           /.well-known/x402                        — x402 commerce discovery manifest
  *           /design-systems                   — catalog list alias (not :id routes)
  *           /catalog                          — same free listing (alias)
  *           /health                           — uptime check
@@ -39,6 +46,26 @@ import {
   x402CatalogPaywall,
   x402Paywall,
 } from './x402';
+import { handleSitemap } from './sitemap';
+import { handleApiCatalog } from './api-catalog';
+import { handleOpenApiSpec } from './openapi-spec';
+import {
+  handleAgentClaimDiscovery,
+  handleAgentRegisterDiscovery,
+  handleAgentRevokeDiscovery,
+  handleAuthMd,
+  handleAuthMethods,
+  handleAuthToken,
+  handleJwks,
+  handleOAuthAuthorizationServer,
+  handleOAuthProtectedResource,
+  respondAdminUnauthorized,
+} from './auth-discovery';
+import { handleHomepage } from './link-headers';
+import { negotiateMarkdownStatic } from './markdown-negotiation';
+import { handleMcpServerCard } from './mcp-server-card';
+import { handleAgentSkillFile, handleAgentSkillsIndex } from './agent-skills-index';
+import { createX402DiscoveryHandler } from './x402-discovery';
 import { PublishRequest, DesignSystemEntry } from './types';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -113,7 +140,7 @@ function requireAdmin(
 ): void {
   const key = req.headers['x-admin-key'];
   if (!key || key !== ADMIN_API_KEY) {
-    res.status(401).json({ error: 'Unauthorized — X-Admin-Key header required' });
+    respondAdminUnauthorized(req, res);
     return;
   }
   next();
@@ -133,6 +160,13 @@ let appPromise: Promise<express.Express> | undefined;
 
 async function buildApp(): Promise<express.Express> {
   const resolvedWalletAddress = await resolveWalletAddress();
+  const facilitatorPreflight = await checkFacilitatorPreflight(FACILITATOR_URL, NETWORK);
+  if (!facilitatorPreflight.ok) {
+    console.error(
+      `WARNING: x402 facilitator preflight failed (${facilitatorPreflight.error ?? 'unknown error'}). Paid routes will return 503 until facilitator config is fixed.`,
+    );
+  }
+
   const app = express();
 
   app.set('trust proxy', 1);
@@ -168,6 +202,40 @@ async function buildApp(): Promise<express.Express> {
     }),
   );
   app.use(express.json());
+  app.get('/', handleHomepage);
+  app.get('/index.html', handleHomepage);
+  app.get('/auth.md', handleAuthMd);
+  app.get('/sitemap.xml', handleSitemap);
+  app.get('/.well-known/api-catalog', handleApiCatalog);
+  app.get('/.well-known/openapi.json', handleOpenApiSpec);
+  app.get('/.well-known/oauth-authorization-server', handleOAuthAuthorizationServer);
+  app.get('/.well-known/oauth-protected-resource', handleOAuthProtectedResource);
+  app.get('/.well-known/auth', handleAuthMethods);
+  app.post('/.well-known/auth/token', handleAuthToken);
+  app.get('/.well-known/jwks.json', handleJwks);
+  app.get('/.well-known/agent/register', handleAgentRegisterDiscovery);
+  app.get('/.well-known/agent/claim', handleAgentClaimDiscovery);
+  app.get('/.well-known/agent/revoke', handleAgentRevokeDiscovery);
+  app.get('/.well-known/mcp/server-card.json', handleMcpServerCard);
+  app.get('/.well-known/agent-skills/index.json', handleAgentSkillsIndex);
+  app.get('/.well-known/agent-skills/:name/SKILL.md', handleAgentSkillFile);
+  app.get(
+    '/.well-known/x402',
+    createX402DiscoveryHandler({
+      facilitatorUrl: FACILITATOR_URL,
+      network: NETWORK,
+      walletAddress: resolvedWalletAddress,
+    }),
+  );
+  app.get(
+    '/.well-known/x402.json',
+    createX402DiscoveryHandler({
+      facilitatorUrl: FACILITATOR_URL,
+      network: NETWORK,
+      walletAddress: resolvedWalletAddress,
+    }),
+  );
+  app.use(negotiateMarkdownStatic);
   app.use(express.static(path.resolve(__dirname, '../public')));
 
   // ─── Free: Catalog discovery (Track A default) ─────────────────────────────

@@ -10,6 +10,7 @@
     "publish-design": "ts-node ../../scripts/publish.ts",
     "publish-pack": "ts-node ../../scripts/publish-pack.ts",
     "smoke": "ts-node ../../scripts/smoke.ts",
+    "check-dns-aid": "ts-node ../../scripts/check-dns-aid.ts",
     "bug-bash": "ts-node ../../scripts/bug-bash.ts",
     "build": "tsc -p ../../tsconfig.json"
   },
