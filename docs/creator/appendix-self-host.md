@@ -37,7 +37,7 @@ This is enough for early testing and small launches.
 
 ## Hosting Options
 
-Use any host that can run a Node app:
+Use any host that can run a Node app. The host is the public computer that runs Curatoria after local testing, serves HTTPS, and stores production environment variables.
 
 | Host type | Notes |
 | --- | --- |
@@ -45,7 +45,7 @@ Use any host that can run a Node app:
 | VPS or EC2 | More control, more operations responsibility. |
 | Container host | Useful when you already deploy containerized services. |
 
-Railway is optional, not required by Curatoria. If you choose it, create the Railway account/project before the deploy step, connect your GitHub repo, confirm trial or billing capacity, set the same environment variables listed below, and use the Railway-provided public URL or your custom domain as `PUBLIC_BASE_URL`.
+Vercel is the reference path in the main guide. Railway is optional, not required by Curatoria. If you choose Railway, create the Railway account and project before the deploy step, connect your GitHub repo, confirm trial or billing capacity, set the same environment variables listed below, and use the Railway-provided public URL or your custom domain as `PUBLIC_BASE_URL`.
 
 Set the host's start command to:
 
@@ -61,7 +61,7 @@ npm run build
 
 ## Required Environment Variables
 
-Set these in your host's secret manager:
+Set these in your host's secret manager. Locally, the same values live in `.env`; in production, they belong in the host dashboard or secret store.
 
 ```bash
 WALLET_ADDRESS=0xYOUR_BASE_WALLET
@@ -71,6 +71,14 @@ PORT=3000
 PUBLIC_BASE_URL=https://yourdomain.com
 FACILITATOR_URL=https://x402.org/facilitator
 ```
+
+What each value means:
+
+- `WALLET_ADDRESS` is the seller payout address for Base USDC. Required for local test and deploy.
+- `ADMIN_API_KEY` is the long random password for admin routes. Required for local test and deploy; never commit it.
+- `NETWORK` chooses `base-sepolia` for testnet or `base` for mainnet. Use mainnet only when real payments are intended.
+- `PUBLIC_BASE_URL` is the public HTTPS origin agents see in catalog and payment URLs. Required after deploy; use the host URL first or a custom domain after DNS is ready.
+- `FACILITATOR_URL` is the x402 verify/settle endpoint. Use `https://x402.org/facilitator` for Base Sepolia; use Coinbase's CDP facilitator URL plus CDP API keys for Base mainnet.
 
 **Track B (optional)** — enable paid catalog with `CATALOG_PAYWALL_ENABLED=1` and catalog access price:
 
@@ -104,6 +112,8 @@ https://yourdomain.com/.well-known/design-catalog.json
 
 On Track B only, document that full metadata requires paid `GET /catalog`.
 
+DNS is the domain setting that points `yourdomain.com` at your host. You can test with the host-provided URL first. Before broad sharing, set `PUBLIC_BASE_URL` to the final custom domain and verify the well-known catalog returns that domain in its URLs.
+
 ## Storage Today
 
 Today, Curatoria expects:
@@ -112,7 +122,7 @@ Today, Curatoria expects:
 - Markdown files in `design-systems/`.
 - Zip bundles in `design-systems/`.
 
-For a small launch, deploy these files with the app. For larger catalogs or bigger bundles, plan to move assets to object storage such as S3, R2, or GCS and keep the registry metadata clean and backed up.
+For the first local Track A run, local files are enough. For a small launch, you can deploy those files with the app. For larger catalogs or bigger bundles, move assets to object storage such as S3, R2, or GCS and keep the registry metadata clean and backed up. Record external file URLs or IDs in the registry and keep provider credentials in host secrets, not in git.
 
 ## Reliability Baseline
 
@@ -150,4 +160,4 @@ The practical progression is:
 5. Managed database or storage-backed registry for larger catalogs.
 6. Provider-specific facilitator configuration if volume or reliability needs require it.
 
-Do not add CDP or provider API keys until your chosen facilitator path requires them. Most creators only need a public payout wallet address to start.
+Do not add CDP or provider API keys until your facilitator path requires them. CDP API keys are only needed for Base mainnet facilitator auth; most creators only need a public payout wallet address to start.

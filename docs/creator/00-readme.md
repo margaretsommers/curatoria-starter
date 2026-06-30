@@ -11,7 +11,7 @@ This guide is for creators who want to fork the public starter, replace the exam
 
 Today, the working path is technical but direct:
 
-0. Complete account preflight: GitHub, payout wallet, admin secret, and later your chosen host/storage/CDP accounts.
+0. Complete account preflight: GitHub for the starter repo, Node/npm for local scripts, a Base payout wallet for `WALLET_ADDRESS`, and a generated admin secret for `ADMIN_API_KEY`. Host, storage, DNS, and CDP accounts are only needed when you deploy, move beyond demo files, or launch on mainnet.
 1. Create a new repo from the `curatoria-starter` template.
 2. Clone it locally and run `npm install`.
 3. Copy `.env.example` to `.env`.
@@ -22,7 +22,7 @@ Today, the working path is technical but direct:
 8. Deploy the Node service so agents can read your public catalog.
 9. Link to the catalog and paid routes from your own site or product pages.
 
-Account setup is real work outside the repo. Before a timed install or human audit, read [`00-accounts-and-env.md#account-preflight`](00-accounts-and-env.md#account-preflight): the first local Track A run needs GitHub access, Node/npm, a Base-compatible payout address, and an `ADMIN_API_KEY`; deploy/mainnet can add Vercel or Railway, DNS, CDP keys, testnet funding, and storage provider setup.
+Account setup is real work outside the repo. Before a timed install or human audit, read [`00-accounts-and-env.md#account-preflight`](00-accounts-and-env.md#account-preflight). It explains what each account or tool is, why Curatoria needs it, when it is required, and where to record the resulting value.
 
 The local service gives you these core URLs. `/` redirects to `/docs.html` for setup docs; creators bring their own homepage.
 

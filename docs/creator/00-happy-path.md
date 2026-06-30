@@ -13,18 +13,18 @@ Do this setup before you time or judge the starter install. The repo can be clon
 
 For the first local Track A run, have ready:
 
-- GitHub access so you can create or fork the starter repo.
-- Node.js and npm on your machine.
-- A Base-compatible payout wallet address for `WALLET_ADDRESS`; Coinbase Wallet is recommended, but any EVM wallet that can receive USDC on Base works.
-- A long random `ADMIN_API_KEY` you generate and keep out of git.
+- **GitHub:** hosts your copy of the starter. Required for clone/install and later deploy connection. Record the repo URL you create from [`curatoria-starter`](https://github.com/margaretsommers/curatoria-starter).
+- **Node.js and npm:** run the service and install packages on your machine. Required for local smoke and deploy builds. Record versions only if setup fails.
+- **Payout wallet:** a Base-compatible seller address that receives USDC. Required as `WALLET_ADDRESS` before real local testing, testnet, or mainnet. Store it in `.env` locally and host env vars after deploy.
+- **Admin secret:** a long random string for admin routes. Required as `ADMIN_API_KEY` locally and in production. Store it in `.env` or host secrets; never commit it.
 
 For deploy and launch, also plan for:
 
-- A managed Node host account. Vercel is the reference path; Railway is optional and requires a Railway account/project, repo connection, env vars, and an active trial or billing setup.
-- A public URL for `PUBLIC_BASE_URL` — either a host URL for testing or a custom domain before broad sharing.
-- Base Sepolia test funds only when you run optional paid proof: test ETH plus test USDC, and a funded buyer wallet/client if you use automated paid tests.
-- Coinbase Developer Platform only when needed: CDP faucet access can help on testnet; CDP API keys are required for Base mainnet facilitator auth.
-- Storage access when moving beyond demo files: local `design-systems/` first, then Google Drive public links or API key, Dropbox share links or OAuth credentials, or HTTPS files on your own domain.
+- **Managed Node host:** Vercel is the reference path; Railway, Fly, Render, or a VPS can work. Required only when you want a public HTTPS service. Record the host project and set env vars in its dashboard.
+- **Public URL and DNS:** `PUBLIC_BASE_URL` is the `https://` origin agents use for catalog and payment URLs. Required for deploy, not localhost. Record the host URL first, then the custom domain/DNS status before broad sharing.
+- **Base Sepolia test funds:** fake ETH and USDC for optional paid proof. Not needed for unpaid smoke. Record faucet links and buyer wallet/client only if you run paid tests.
+- **Coinbase Developer Platform:** optional for testnet faucet access; required for Base mainnet facilitator keys. Record `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` only in host secrets when mainnet is configured.
+- **Storage provider:** local `design-systems/` works first. Google Drive, Dropbox, or HTTPS storage is only needed when production files should live outside git. Record file URLs/IDs and any provider credentials in production setup notes.
 
 Full details: [Account Preflight](00-accounts-and-env.md#account-preflight).
 

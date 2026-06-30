@@ -14,7 +14,7 @@ Curatoria Starter is a template for selling original design resources through an
 
 ## Quick Start
 
-Before timing the install, finish the account preflight in `docs/creator/00-accounts-and-env.md`. The first local Track A run needs GitHub access, Node/npm, a Base-compatible payout wallet address, and a generated `ADMIN_API_KEY`. Deploy/mainnet may add Vercel or Railway, DNS, CDP keys, testnet funding, and storage-provider setup.
+Before timing the install, finish the account preflight in `docs/creator/00-accounts-and-env.md`. It explains each account or tool, why Curatoria needs it, when it is required, and where to record the resulting value. The first local Track A run needs GitHub access, Node/npm, a Base-compatible payout wallet address for `WALLET_ADDRESS`, and a generated admin secret for `ADMIN_API_KEY`. Host, DNS, CDP, paid testnet funds, and external storage setup can wait until deploy, paid proof, or mainnet launch.
 
 1. Use this repository as a GitHub template, then clone your new repo.
 2. Install dependencies:

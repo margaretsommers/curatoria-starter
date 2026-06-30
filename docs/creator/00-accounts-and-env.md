@@ -7,21 +7,25 @@ Before you clone the starter or run your first smoke test, it helps to know what
 
 ## Account Preflight
 
-Do this account and access work before you start timing the starter install. The starter is small, but a real creator setup depends on accounts outside the repo.
+Do this account and access work before you judge the starter install. The starter is small, but a real creator setup depends on accounts outside the repo.
 
-| Need | Required for | Track A default | Track B optional | What to have ready |
+Track A is the default path: agents can read the full catalog for free and pay only for assets. Track B is optional paid catalog mode and can wait until Track A works.
+
+| Account or tool | What it is | Why Curatoria needs it | Required when | Where to record the value |
 | --- | --- | --- | --- | --- |
-| **GitHub account** | Clone, template repo, host deploy connection | Yes | Yes | Access to create a repo from [`curatoria-starter`](https://github.com/margaretsommers/curatoria-starter) and connect it to your host |
-| **Managed Node host** | Public HTTPS deployment | Yes for launch | Yes for launch | Vercel is the reference path; Railway, Fly.io, Render, or a VPS can work if you set env vars and run `npm run build` + `npm run start` |
-| **Railway account** | Only if you choose Railway as the host | No if using Vercel or another host | Same | Railway project access, billing/trial status understood, repo connected, and a public service URL or custom domain planned |
-| **Payout wallet on Base** | Local server start, `402` challenges, settlement destination | Yes | Yes | A dedicated EVM receive address for `WALLET_ADDRESS`; use Base Sepolia for testnet and Base mainnet only when ready |
-| **Base Sepolia test funds** | Optional paid testnet proof | Not needed for unpaid smoke; needed for paid proof | Same | Test ETH from CDP faucet and test USDC from Circle faucet, plus an x402-capable buyer wallet if you run paid proof |
-| **Coinbase Developer Platform (CDP)** | Mainnet facilitator auth and testnet faucet access | Faucet optional on testnet; API keys required for mainnet | Same | CDP portal access; for mainnet, `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` with x402 facilitator permissions |
-| **Storage provider** | Production products beyond demo files | Optional for first local run | Same | Local files work first. For production, have Google Drive/Dropbox/HTTPS file access and sharing/API credentials ready if needed |
-| **Domain / DNS** | Stable public catalog URL | Recommended for launch | Recommended for launch | Domain or host subdomain for `PUBLIC_BASE_URL`; custom DNS before broad sharing |
-| **Admin secret owner** | Publish/admin routes | Yes | Yes | A long random `ADMIN_API_KEY`, stored in `.env` locally and host secrets in production |
+| **GitHub account** | Source-code hosting for your copy of the starter | Lets you clone [`curatoria-starter`](https://github.com/margaretsommers/curatoria-starter), save your changes, and connect the repo to a deploy host | Local clone and deploy | Repo URL in your project notes; no `.env` value |
+| **Node.js and npm** | Local JavaScript runtime and package manager | Runs the Curatoria service, installs dependencies, and runs smoke checks | Local test and deploy builds | Install on your machine; record versions only when debugging |
+| **Payout wallet on Base** | Seller EVM address that can receive USDC on Base | Becomes `WALLET_ADDRESS`; x402 challenges tell buyers where payment settles | Real local run, testnet, and mainnet | `.env` locally; host secret/env var in production |
+| **Admin secret** | Long random password for admin-only routes | Becomes `ADMIN_API_KEY`; protects publish and facilitator preflight endpoints | Local test and deploy | `.env` locally; host secret/env var in production; never commit it |
+| **Managed Node host** | Public server platform for the Node service | Gives agents an HTTPS URL for catalog and paid routes | Deploy and launch, not local smoke | Host dashboard/project notes; env vars in host settings |
+| **Vercel account** | Managed deploy host used as the reference path in this guide | Connects to GitHub and serves the Node handler over HTTPS | Deploy if you choose Vercel | Vercel project settings and environment variables |
+| **Railway account** | Optional managed Node host alternative | Runs the same service as a long-lived Node app if you prefer Railway | Deploy only if you choose Railway | Railway project settings, public URL, and environment variables |
+| **Public URL / DNS** | Host URL or custom domain that resolves to the service | Becomes `PUBLIC_BASE_URL` so catalog and payment URLs are absolute HTTPS URLs | Deploy and launch, not localhost | `PUBLIC_BASE_URL` in host env; domain/DNS notes outside git |
+| **Base Sepolia test funds** | Test ETH for gas and test USDC for fake payments | Lets you run optional paid proof without real money | Optional paid testnet proof only | Faucet notes and buyer wallet address outside git |
+| **Coinbase Developer Platform (CDP)** | Coinbase developer portal for faucets and mainnet x402 facilitator keys | Testnet faucet access is optional; mainnet facilitator auth needs `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` | Optional for testnet faucet; required before Base mainnet facilitator use | Host secrets/env vars for mainnet keys; do not put keys in `.env.example` |
+| **Storage provider** | Place where product files live, such as local files, Google Drive, Dropbox, or HTTPS URLs | The service delivers product bytes after payment | Local `design-systems/` for first run; external storage only when moving beyond demo files | Registry entries, file URLs/IDs, and provider credentials as needed |
 
-For the first local Track A run, the shortest real preflight is: GitHub access, Node/npm installed, a Base-compatible payout address, and a generated `ADMIN_API_KEY`. Railway, CDP mainnet keys, paid buyer-wallet setup, custom domain, and production storage can wait until deploy/testnet/mainnet steps.
+For the first local Track A run, the shortest real preflight is: GitHub access, Node/npm installed, a Base-compatible payout address, and a generated `ADMIN_API_KEY`. Vercel/Railway, CDP mainnet keys, paid buyer-wallet setup, custom domain, and production storage can wait until deploy, testnet paid proof, or mainnet launch.
 
 ## Overview
 
@@ -132,7 +136,7 @@ Set `AWAL_PAID_TEST=1` only after awal is authenticated and the buyer wallet is 
 
 The service exports a Vercel-compatible handler (`src/server.ts`). Connect your GitHub repo, set build/start per your `package.json`, and add all production env vars in the dashboard.
 
-**Note:** Margaret's live deployment uses Vercel + custom domain. This is the proven path in the operator repo; other hosts work too.
+This guide uses Vercel as the reference path because it can connect a GitHub repo, store environment variables, and serve HTTPS without managing a server. Other hosts work if they run the same build/start commands and expose a stable public URL.
 
 ### Domain registrar / DNS
 
@@ -161,7 +165,7 @@ There is no Railway config file in the starter repo. If you choose Railway, crea
 | | |
 | --- | --- |
 | **What for** | Keeping product files out of git while the server fetches bytes after payment. |
-| **Signup** | Use your existing Google or Dropbox account |
+| **Signup** | Sign in with a Google or Dropbox account you control |
 | **Free tier** | Standard free storage tiers apply |
 | **When** | When local `design-systems/` files are not your production path |
 
