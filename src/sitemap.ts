@@ -9,11 +9,6 @@ export const SITEMAP_OUTPUT_PATH = path.join(__dirname, '../public/sitemap.xml')
 
 const STATIC_PAGES: Array<{ path: string; priority?: string }> = [
   { path: '/', priority: '1.0' },
-  { path: '/starter-guide.html', priority: '0.8' },
-  { path: '/whitepaper', priority: '0.8' },
-  { path: '/privacy.html', priority: '0.3' },
-  { path: '/privacy-policy.html', priority: '0.3' },
-  { path: '/llms.txt', priority: '0.7' },
   { path: '/auth.md', priority: '0.7' },
   { path: '/.well-known/agent-skills/index.json', priority: '0.7' },
   { path: '/.well-known/x402', priority: '0.8' },

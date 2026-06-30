@@ -137,7 +137,7 @@ If you do not see `402 Payment Required`, check:
 
 - You are calling a paid route (`/design-systems/:id`, `/packs/:id/download`, or unpaid `/catalog` on Track B) — not the free well-known teaser.
 - The product exists and is active.
-- The server is running the Curatoria service with `npm run dev`, not only the static site workspace.
+- The server is running the Curatoria service with `npm run dev`.
 
 ## Paid Request Fails
 

@@ -12,10 +12,8 @@ const HOMEPAGE_PATH = path.join(PUBLIC_DIR, 'index.html');
 export function buildHomepageLinkHeader(): string {
   return [
     '</.well-known/api-catalog>; rel="api-catalog"',
+    '</.well-known/design-catalog.json>; rel="catalog"; type="application/json"',
     '</.well-known/x402>; rel="payment-service"; type="application/json"',
-    '</llms.txt>; rel="service-desc"',
-    '</starter-guide.html>; rel="service-doc"',
-    '</llms.txt>; rel="describedby"',
   ].join(', ');
 }
 

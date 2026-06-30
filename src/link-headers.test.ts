@@ -7,7 +7,6 @@ test('buildHomepageLinkHeader advertises agent discovery resources', () => {
   const header = buildHomepageLinkHeader();
 
   assert.match(header, /<\/.well-known\/api-catalog>; rel="api-catalog"/);
-  assert.match(header, /<\/llms\.txt>; rel="service-desc"/);
-  assert.match(header, /<\/starter-guide\.html>; rel="service-doc"/);
-  assert.match(header, /<\/llms\.txt>; rel="describedby"/);
+  assert.match(header, /<\/.well-known\/design-catalog\.json>; rel="catalog"/);
+  assert.match(header, /<\/.well-known\/x402>; rel="payment-service"/);
 });

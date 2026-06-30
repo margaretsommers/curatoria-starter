@@ -310,21 +310,14 @@ export async function checkUnpaidBundle402(
 }
 
 export async function checkHumanPages(baseUrl: string): Promise<CheckResult[]> {
-  const pages = [
-    { name: 'home page', path: '/' },
-    { name: 'docs page', path: '/docs.html' },
+  const res = await fetch(`${baseUrl}/`);
+  return [
+    {
+      name: 'home page',
+      ok: res.ok,
+      detail: `status ${res.status}`,
+    },
   ];
-
-  return Promise.all(
-    pages.map(async ({ name, path }) => {
-      const res = await fetch(`${baseUrl}${path}`);
-      return {
-        name,
-        ok: res.ok,
-        detail: `status ${res.status}`,
-      };
-    }),
-  );
 }
 
 export async function runSmokeChecks(

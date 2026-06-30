@@ -7,7 +7,7 @@ Curatoria Starter is a template for selling original design resources through an
 - A working x402 paywall service on `npm run dev`
 - Generic demo products in `design-systems/`: one Markdown file and one zip bundle
 - A free full catalog at `/.well-known/design-catalog.json` and `GET /catalog` (Track A default); pay per asset only
-- A root URL that redirects to `/docs.html` for setup docs
+- A minimal root page at `/` with links to the catalog and setup docs on GitHub
 - A first-time tester checklist in `TESTING.md`
 - Publish scripts for markdown design systems and downloadable packs
 - `npm run bug-bash` checks for health, free catalog at well-known, unpaid asset 402, and Bazaar metadata
@@ -51,7 +51,7 @@ If you are testing this starter for Curatoria, use `TESTING.md` before the Quick
 
 Open:
 
-- Docs redirect: `http://localhost:3000/` -> `http://localhost:3000/docs.html`
+- Service landing: `http://localhost:3000/` (catalog links plus GitHub setup guide)
 - Discovery catalog: `http://localhost:3000/.well-known/design-catalog.json` (full `design_systems[]` with prices and access_url)
 - Catalog alias: `curl http://localhost:3000/catalog` (expect `200` with same listing)
 - Markdown paywall check: `http://localhost:3000/design-systems/curatoria-demo-md`

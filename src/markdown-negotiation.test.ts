@@ -26,9 +26,10 @@ test('htmlToAgentMarkdown converts homepage HTML to markdown with frontmatter', 
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf-8');
   const markdown = htmlToAgentMarkdown(html);
 
-  assert.match(markdown, /^---\ntitle: Curatoria\n---\n\n/);
-  assert.match(markdown, /# Your taste has a price\./);
-  assert.match(markdown, /Agents reuse your design decisions every day\./);
+  assert.match(markdown, /^---\ntitle: Curatoria Starter\n---\n\n/);
+  assert.match(markdown, /# Curatoria Starter/);
+  assert.match(markdown, /README on GitHub/);
+  assert.match(markdown, /\[Catalog\]\(\/.well-known\/design-catalog\.json\)/);
   assert.doesNotMatch(markdown, /<html/i);
 });
 

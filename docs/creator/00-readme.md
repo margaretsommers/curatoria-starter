@@ -24,10 +24,10 @@ Today, the working path is technical but direct:
 
 Account setup is real work outside the repo. Before a timed install or human audit, read [`00-accounts-and-env.md#account-preflight`](00-accounts-and-env.md#account-preflight). It explains what each account or tool is, why Curatoria needs it, when it is required, and where to record the resulting value.
 
-The local service gives you these core URLs. `/` redirects to `/docs.html` for setup docs; creators bring their own homepage.
+The local service gives you these core URLs. `/` serves a minimal landing page with catalog links and a GitHub setup guide; creators bring their own homepage.
 
 ```bash
-http://localhost:3000/docs.html
+http://localhost:3000/
 http://localhost:3000/.well-known/design-catalog.json
 http://localhost:3000/design-systems/example-minimal
 ```

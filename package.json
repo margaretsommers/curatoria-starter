@@ -19,9 +19,7 @@
     "check-dns-aid": "npm run check-dns-aid --workspace @curatoria/service",
     "bug-bash": "npm run bug-bash --workspace @curatoria/service --",
     "publish-design": "npm run publish-design --workspace @curatoria/service --",
-    "publish-pack": "npm run publish-pack --workspace @curatoria/service --",
-    "dev:site": "npm run dev --workspace @curatoria/site",
-    "start:site": "npm run start --workspace @curatoria/site"
+    "publish-pack": "npm run publish-pack --workspace @curatoria/service --"
   },
   "engines": {
     "node": ">=18.0.0"
