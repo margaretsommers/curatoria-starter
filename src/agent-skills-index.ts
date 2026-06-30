@@ -49,7 +49,10 @@ export const AGENT_SKILLS_REGISTRY: AgentSkillRegistryEntry[] = [
     type: 'skill-md',
     description:
       'End-to-end creator onboarding for curatoria-starter: wallet setup, storage, publishing, testnet proof, and mainnet go-live.',
-    sourcePath: path.join(REPO_ROOT, '.agents/skills/creator-setup/SKILL.md'),
+    sourcePath: path.join(
+      REPO_ROOT,
+      'public/.well-known/agent-skills/creator-setup/SKILL.md',
+    ),
     urlPath: '/.well-known/agent-skills/creator-setup/SKILL.md',
   },
 ];

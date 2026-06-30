@@ -47,7 +47,7 @@ export function buildMcpServerCard(baseUrl: string): McpServerCard {
       version: '1.0.0',
     },
     description:
-      'Discover free design catalogs and pay for markdown or zip assets with x402 USDC on Base. Catalog tools and resources are derived from the live registry.',
+      'Discovery metadata for Curatoria HTTP x402 catalog routes. Integration is via GET /.well-known/design-catalog.json and paid asset URLs — not a live MCP tool server.',
     documentationUrl: `${origin}/llms.txt`,
     transport: {
       type: 'streamable-http',
@@ -64,7 +64,7 @@ export function buildMcpServerCard(baseUrl: string): McpServerCard {
       resource_metadata: `${origin}/.well-known/oauth-protected-resource`,
     },
     instructions:
-      'Read /llms.txt for buyer flow. Free catalog: GET /.well-known/design-catalog.json. Paid assets use x402 payment signatures after HTTP 402.',
+      'No MCP transport is deployed at /mcp. Read /llms.txt for buyer flow. Free catalog: GET /.well-known/design-catalog.json. Paid assets use x402 after HTTP 402 on each access_url.',
     resources: 'dynamic',
     tools: 'dynamic',
   };
