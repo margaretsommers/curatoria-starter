@@ -38,6 +38,44 @@ test('rewriteDropboxShareUrl forces dl=1 for share links', () => {
   assert.equal(unchangedDirect.hostname, 'dl.dropboxusercontent.com');
 });
 
+test('resolveResource fetches Dropbox share-link bytes directly', async () => {
+  const prevFetch = globalThis.fetch;
+  try {
+    let fetchUrl = '';
+    globalThis.fetch = (async (input: string | URL) => {
+      fetchUrl = String(input);
+      return new Response('dropbox-bytes', {
+        status: 200,
+        headers: { 'content-type': 'text/markdown' },
+      });
+    }) as typeof fetch;
+
+    const resolved = await resolveResource({
+      id: 'dropbox-doc',
+      file: 'my-doc.md',
+      name: 'Dropbox Doc',
+      description: '',
+      price_usd: '0.05',
+      tags: [],
+      published_at: new Date().toISOString(),
+      active: true,
+      source: {
+        type: 'dropbox',
+        share_url: 'https://www.dropbox.com/s/abc123/my-doc.md?dl=0',
+      },
+    });
+
+    const fetched = new URL(fetchUrl);
+    assert.equal(fetched.hostname, 'www.dropbox.com');
+    assert.equal(fetched.searchParams.get('dl'), '1');
+    assert.equal(resolved.buffer.toString(), 'dropbox-bytes');
+    assert.equal(resolved.mimeType, 'text/markdown');
+    assert.equal(resolved.sourceType, 'dropbox');
+  } finally {
+    globalThis.fetch = prevFetch;
+  }
+});
+
 test('buildSource stores Dropbox share URL and enforces exclusivity', () => {
   const built = buildSource({
     id: 'dropbox-doc',

@@ -99,6 +99,49 @@ Returns the same `CatalogResponse` shape Track A exposes for free: `design_syste
 | `GET /packs/:id/download` | Paid zip | Paid zip |
 | `GET /health` | Service health | Service health |
 
+## Well-Known Design Catalog Audit
+
+`/.well-known/design-catalog.json` is Curatoria's stable discovery document. Its
+job is to help an agent answer three questions before it pays: who owns this
+catalog, what products are available, and which paid URL should it request next.
+It is not the sellable asset, a storage manifest, or a secret-bearing config
+file.
+
+Agents use it as the first read in the flow:
+
+1. Fetch `/.well-known/design-catalog.json` from the creator's domain.
+2. Read `owner`, `total`, `base_url`, and `design_systems[]` on Track A, or
+   `owner`, `total`, and `paid_catalog_url` on Track B.
+3. Choose a product by `id`, `name`, `description`, `tags`, `resource_type`,
+   `mime_type`, and `price_usd`.
+4. Request the product's `access_url` or `download_url`, receive `402 Payment
+   Required`, and complete x402 payment on that asset route.
+
+Fields that are product-specific and must stay stable for v1:
+
+- `id` — route slug and durable product identifier.
+- `name`, `description`, and `tags` — agent-readable merchandising metadata.
+- `price_usd` — decimal USD price used to build the x402 amount.
+- `resource_type` and `mime_type` — tells an agent whether it is buying markdown
+  or a zip bundle.
+- `access_url` and `download_url` — paid route URLs; these are not raw storage
+  links.
+- `payment_required: true` — signals that the next route is paid.
+
+Fields that should never appear in well-known: local filenames, Dropbox share
+URLs, Dropbox private paths, Google Drive file IDs, direct source URLs, API keys,
+admin keys, buyer wallets, or private operator notes. Curatoria strips `file` and
+`source` from the catalog response for this reason.
+
+Recommendation for v1: keep the `.well-known` location and JSON response stable,
+but do not over-standardize the schema beyond Curatoria's current agent flow.
+Generic `.well-known` conventions mostly require a predictable HTTPS URL,
+machine-readable JSON, cacheable public metadata, and no secrets. Curatoria should
+conform to those conventions while keeping Curatoria-specific fields such as
+`design_systems`, `price_usd`, `access_url`, and Track B's `paid_catalog_url`.
+Renaming to a generic product schema would add migration risk without improving
+agent behavior today.
+
 ## Agent Flows
 
 ### Track A — numbered steps (default)

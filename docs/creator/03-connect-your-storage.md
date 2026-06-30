@@ -114,7 +114,9 @@ connector is active at `GET /health` — look for
 ## Option D — Dropbox (Mode A link-share + Mode B OAuth/private path)
 
 Dropbox Mode A works with a normal share link and does not require API keys.
-Publish with `--dropbox-url`:
+This is the Dropbox path to try first: put the finished `.md` or `.zip` file in
+Dropbox, choose **Share → Copy link**, confirm anyone with the link can view it,
+then publish with `--dropbox-url`:
 
 ```bash
 npm run publish-design -- \
@@ -133,7 +135,9 @@ npm run publish-pack -- \
 ```
 
 Curatoria validates Dropbox hosts and rewrites share links from `?dl=0` to
-`?dl=1` at fetch time so paid buyers receive file bytes directly.
+`?dl=1` at fetch time so paid buyers receive file bytes directly. The share URL
+stays in `design-systems/.registry.json`; it is never included in well-known,
+`/catalog`, or `402` responses.
 
 ### Mode B (private files with OAuth)
 
@@ -197,6 +201,40 @@ product stores a small `source` block instead of a committed file:
   "file": "your-drive-doc.md",
   "source": { "type": "gdrive", "file_id": "1AbC...XYZ" },
   "name": "Your Drive Doc",
+  "price_usd": "0.05",
+  "tags": [],
+  "active": true
+}
+```
+
+Dropbox Mode A stores the shared link:
+
+```json
+{
+  "id": "your-dropbox-doc",
+  "file": "your-doc.md",
+  "source": {
+    "type": "dropbox",
+    "share_url": "https://www.dropbox.com/s/abc123/your-doc.md?dl=0"
+  },
+  "name": "Your Dropbox Doc",
+  "price_usd": "0.05",
+  "tags": [],
+  "active": true
+}
+```
+
+Dropbox Mode B stores the private path and reads credentials from env vars:
+
+```json
+{
+  "id": "your-dropbox-private-doc",
+  "file": "your-doc.md",
+  "source": {
+    "type": "dropbox",
+    "dropbox_path": "/Design Systems/your-doc.md"
+  },
+  "name": "Your Private Dropbox Doc",
   "price_usd": "0.05",
   "tags": [],
   "active": true

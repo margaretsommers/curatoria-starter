@@ -82,8 +82,8 @@ npm run publish-pack -- \
   --price 12.00
 ```
 
-You do not have to commit the file. You can also sell from a URL you control or
-from Google Drive by swapping the source flag:
+You do not have to commit the file. You can also sell from a URL you control,
+from Google Drive, or from Dropbox by swapping the source flag:
 
 ```bash
 # From your own domain / CDN / object storage
@@ -92,6 +92,10 @@ npm run publish-design -- --id my-doc --url https://files.yourdomain.com/my-doc.
 
 # From a Google Drive file shared "Anyone with the link can view"
 npm run publish-design -- --id my-doc --gdrive-id "https://drive.google.com/file/d/<ID>/view" \
+  --name "My Doc" --price 5.00
+
+# From a Dropbox file shared "Anyone with the link can view"
+npm run publish-design -- --id my-doc --dropbox-url "https://www.dropbox.com/s/.../my-doc.md?dl=0" \
   --name "My Doc" --price 5.00
 ```
 
@@ -113,9 +117,9 @@ https://yourdomain.com/catalog
 
 ## What Is Planned
 
-Available today: local files in `design-systems/`, direct URL / your-domain sources, Google Drive sources, CLI publishing, x402 payment checks, built-in Bazaar discovery metadata in `402` responses, and self-hosted deployment.
+Available today: local files in `design-systems/`, direct URL / your-domain sources, Google Drive sources, Dropbox Mode A share links, Dropbox Mode B private paths with OAuth env vars, CLI publishing, x402 payment checks, built-in Bazaar discovery metadata in `402` responses, and self-hosted deployment.
 
-Coming soon: Dropbox and iCloud connectors, OAuth-based Google Drive, no-terminal publishing, and stronger zero-touch external Bazaar indexing coverage.
+Coming soon: iCloud/CloudKit assessment follow-through, OAuth-based Google Drive, no-terminal publishing, and stronger zero-touch external Bazaar indexing coverage.
 
 ## Safety Notes
 
