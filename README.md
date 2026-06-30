@@ -8,6 +8,7 @@ Curatoria Starter is a template for selling original design resources through an
 - Generic demo products in `design-systems/`: one Markdown file and one zip bundle
 - A free full catalog at `/.well-known/design-catalog.json` and `GET /catalog` (Track A default); pay per asset only
 - A root URL that redirects to `/docs.html` for setup docs
+- A first-time tester checklist in `TESTING.md`
 - Publish scripts for markdown design systems and downloadable packs
 - `npm run bug-bash` checks for health, free catalog at well-known, unpaid asset 402, and Bazaar metadata
 - Starter policy guidance in `docs/acceptable-use-and-content-ownership.md`
@@ -15,6 +16,8 @@ Curatoria Starter is a template for selling original design resources through an
 ## Quick Start
 
 Before timing the install, finish the account preflight in `docs/creator/00-accounts-and-env.md`. It explains each account or tool, why Curatoria needs it, when it is required, and where to record the resulting value. The first local Track A run needs GitHub access, Node/npm, a Base-compatible payout wallet address for `WALLET_ADDRESS`, and a generated admin secret for `ADMIN_API_KEY`. Host, DNS, CDP, paid testnet funds, and external storage setup can wait until deploy, paid proof, or mainnet launch.
+
+If you are testing this starter for Curatoria, use `TESTING.md` before the Quick Start. It separates account setup time from the timed local install run and explains what feedback to send to `curatoria.dev@pm.me`.
 
 1. Use this repository as a GitHub template, then clone your new repo.
 2. Install dependencies:
