@@ -1,6 +1,6 @@
 # Curatoria Starter
 
-Curatoria Starter is a **developer template** for selling original design resources through an x402 paywall. It runs one Node service for catalog metadata and paid resource endpoints. Bring your own site, then link to the service's catalog and paid routes from there.
+Curatoria Starter is a template for selling original design resources through an x402 paywall. It runs one Node service for catalog metadata and paid resource endpoints. Bring your own site, then link to the service's catalog and paid routes from there.
 
 ## Developer Starter Expectations
 
