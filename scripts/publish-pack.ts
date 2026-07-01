@@ -33,8 +33,7 @@
 
 import fs from 'fs';
 import path from 'path';
-
-const ROOT_DIR = path.resolve(__dirname, '..');
+import { resolveLocalDesignSystemsFile } from '../src/paths';
 
 // Resolve src modules relative to this script (handles both ts-node and compiled)
 const catalogPath = path.join(__dirname, '../src/catalog');
@@ -99,10 +98,17 @@ try {
 
 // For local bundles, confirm the .zip is actually on disk before registering.
 if (!built.source && args.zip) {
-  const zipPath = path.isAbsolute(args.zip) ? args.zip : path.resolve(ROOT_DIR, args.zip);
+  let zipPath: string;
+  try {
+    zipPath = resolveLocalDesignSystemsFile(args.zip);
+  } catch (err) {
+    console.error(`\n${String(err instanceof Error ? err.message : err)}\n`);
+    process.exit(1);
+  }
   if (!fs.existsSync(zipPath)) {
     console.error(`\nZip file not found: ${zipPath}`);
-    console.error('Make sure the bundle file exists first.\n');
+    console.error('Place the bundle under design-systems/ first, then publish with:');
+    console.error('  --zip design-systems/your-bundle.zip\n');
     process.exit(1);
   }
   if (path.extname(zipPath).toLowerCase() !== '.zip') {

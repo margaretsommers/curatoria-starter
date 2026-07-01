@@ -30,8 +30,10 @@ import helmet from 'helmet';
 import cors from 'cors';
 import path from 'path';
 
+import { ENV_PATH, PUBLIC_DIR } from './paths';
+
 // Load repo-root .env (npm workspaces run dev from apps/curatoria-service).
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: ENV_PATH });
 
 import {
   handleFullCatalog,
@@ -236,7 +238,7 @@ async function buildApp(): Promise<express.Express> {
     }),
   );
   app.use(negotiateMarkdownStatic);
-  app.use(express.static(path.resolve(__dirname, '../public')));
+  app.use(express.static(PUBLIC_DIR));
 
   // ─── Free: Catalog discovery (Track A default) ─────────────────────────────
 

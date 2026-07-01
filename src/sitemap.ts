@@ -1,11 +1,11 @@
 import fs from 'fs';
-import path from 'path';
 import { Request, Response } from 'express';
 import { listActive, readCatalog } from './catalog';
 import { requestBaseUrl } from './discovery';
+import { SITEMAP_PATH } from './paths';
 import { DesignSystemEntry } from './types';
 
-export const SITEMAP_OUTPUT_PATH = path.join(__dirname, '../public/sitemap.xml');
+export const SITEMAP_OUTPUT_PATH = SITEMAP_PATH;
 
 const STATIC_PAGES: Array<{ path: string; priority?: string }> = [
   { path: '/', priority: '1.0' },

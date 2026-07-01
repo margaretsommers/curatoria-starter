@@ -22,9 +22,8 @@
 
 import fs from 'fs';
 import path from 'path';
+import { DESIGN_SYSTEMS_DIR } from './paths';
 import { DesignSystemEntry, EntrySource, ResourceType, StorageSourceType } from './types';
-
-const DESIGN_SYSTEMS_DIR = path.join(__dirname, '../design-systems');
 
 /** Abort a remote source fetch that takes longer than this. */
 const FETCH_TIMEOUT_MS = parseInt(process.env.STORAGE_FETCH_TIMEOUT_MS ?? '15000', 10);

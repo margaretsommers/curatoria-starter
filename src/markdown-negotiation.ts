@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response, NextFunction } from 'express';
+import { PUBLIC_DIR } from './paths';
 
-export const PUBLIC_DIR = path.resolve(__dirname, '../public');
+export { PUBLIC_DIR };
 
 type AcceptEntry = { type: string; q: number };
 

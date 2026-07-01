@@ -36,8 +36,7 @@
 
 import fs from 'fs';
 import path from 'path';
-
-const ROOT_DIR = path.resolve(__dirname, '..');
+import { resolveLocalDesignSystemsFile } from '../src/paths';
 
 // Resolve src modules relative to this script (handles both ts-node and compiled)
 const catalogPath = path.join(__dirname, '../src/catalog');
@@ -106,12 +105,17 @@ try {
 
 // For local files, confirm the file is actually on disk before registering.
 if (!built.source && args.file) {
-  const filePath = path.isAbsolute(args.file)
-    ? args.file
-    : path.resolve(ROOT_DIR, args.file);
+  let filePath: string;
+  try {
+    filePath = resolveLocalDesignSystemsFile(args.file);
+  } catch (err) {
+    console.error(`\n${String(err instanceof Error ? err.message : err)}\n`);
+    process.exit(1);
+  }
   if (!fs.existsSync(filePath)) {
     console.error(`\nFile not found: ${filePath}`);
-    console.error('Make sure the .md file exists in the design-systems/ directory first.\n');
+    console.error('Place the file under design-systems/ first, then publish with:');
+    console.error('  --file design-systems/your-product.md\n');
     process.exit(1);
   }
 }

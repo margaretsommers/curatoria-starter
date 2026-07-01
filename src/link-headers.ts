@@ -1,8 +1,7 @@
 import path from 'path';
 import { Request, Response } from 'express';
+import { PUBLIC_DIR } from './paths';
 import { sendPublicHtml } from './markdown-negotiation';
-
-const PUBLIC_DIR = path.resolve(__dirname, '../public');
 const HOMEPAGE_PATH = path.join(PUBLIC_DIR, 'index.html');
 
 /**

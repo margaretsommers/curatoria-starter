@@ -1,10 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { DESIGN_SYSTEMS_DIR, REGISTRY_PATH } from './paths';
 import { writeSitemapFile } from './sitemap';
 import { DesignCatalog, DesignSystemEntry } from './types';
-
-const REGISTRY_PATH = path.join(__dirname, '../design-systems/.registry.json');
-const DESIGN_SYSTEMS_DIR = path.join(__dirname, '../design-systems');
 
 /**
  * Reads the full registry from disk on every call.

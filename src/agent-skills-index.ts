@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
 import { requestBaseUrl } from './discovery';
+import { REPO_ROOT } from './paths';
 
 export const AGENT_SKILLS_DISCOVERY_SCHEMA =
   'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
@@ -29,8 +30,6 @@ export type AgentSkillsDiscoveryIndex = {
   $schema: string;
   skills: AgentSkillIndexEntry[];
 };
-
-const REPO_ROOT = path.join(__dirname, '..');
 
 export const AGENT_SKILLS_REGISTRY: AgentSkillRegistryEntry[] = [
   {

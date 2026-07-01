@@ -1,6 +1,55 @@
 # Curatoria Starter
 
-Curatoria Starter is a template for selling original design resources through an x402 paywall. It runs one Node service for catalog metadata and paid resource endpoints. Bring your own site, then link to the service's catalog and paid routes from there.
+Curatoria Starter is a **developer template** for selling original design resources through an x402 paywall. It runs one Node service for catalog metadata and paid resource endpoints. Bring your own site, then link to the service's catalog and paid routes from there.
+
+## Developer Starter Expectations
+
+This repo is meant for builders who are comfortable in the terminal. It is not a no-code storefront yet.
+
+| Expectation | Detail |
+| --- | --- |
+| **Audience** | Developers or technical creators who can run Node, edit `.env`, and use curl |
+| **What ships** | One paywall service, demo products, CLI publish scripts, and creator docs |
+| **What you bring** | Your own homepage or marketing site, payout wallet, hosting, and product files |
+| **Default discovery track** | **Track A** — free full catalog at well-known; pay per asset only |
+| **Local proof gate** | `npm run smoke`, then `npm run bug-bash -- --local` while `npm run dev` is running |
+| **First-time testers** | Use `TESTING.md` and send friction notes to `curatoria.dev@pm.me` |
+
+### Repository Layout
+
+All paths in docs and CLI commands are relative to the **repository root**, not the npm workspace folder.
+
+```text
+curatoria-starter/
+├── .env.example              # copy to repo-root .env
+├── design-systems/           # sellable files + .registry.json catalog metadata
+├── docs/creator/             # step-by-step creator guide
+├── public/                   # minimal service landing page + agent skill files
+├── scripts/                  # publish, smoke, and bug-bash tooling
+├── src/                      # Express service, x402 paywall, discovery routes
+└── apps/curatoria-service/   # npm workspace wrapper for dev/start scripts
+```
+
+Run commands from the repo root (`npm install`, `npm run dev`, `npm run publish-design`, etc.). The workspace wrapper lives under `apps/curatoria-service/`, but `.env`, `design-systems/`, and publish paths always resolve from the repo root.
+
+### HTTP Routes
+
+| Route | Access | Purpose |
+| --- | --- | --- |
+| `GET /health` | Free | Service health and network check |
+| `GET /.well-known/design-catalog.json` | Free | Agent discovery catalog (Track A default) |
+| `GET /catalog` | Free | Same listing as well-known |
+| `GET /design-systems/:id` | Paid (402 when unpaid) | Markdown product bytes |
+| `GET /packs/:id/download` | Paid (402 when unpaid) | Zip bundle bytes |
+| `GET /` | Free | Minimal landing page with catalog links |
+
+Optional **Track B** (`CATALOG_PAYWALL_ENABLED=1`) makes `GET /catalog` paid and switches well-known to a teaser. See `docs/creator/01-before-you-start.md`.
+
+### What Works Today vs Planned
+
+**Available today:** local files in `design-systems/`, direct URL / your-domain sources, Google Drive, Dropbox link-share and OAuth paths, CLI publishing, x402 payment checks, built-in Bazaar metadata in `402` responses, and self-hosted deployment.
+
+**Coming soon:** iCloud/CloudKit assessment follow-through, OAuth-based Google Drive, no-terminal publishing, and stronger zero-touch external Bazaar indexing coverage.
 
 ## What You Get
 
@@ -80,10 +129,12 @@ For downloadable bundles, use:
 ```bash
 npm run publish-pack -- \
   --id my-pack \
-  --zip path/to/my-pack.zip \
+  --zip design-systems/my-pack.zip \
   --name "My Pack" \
   --price 12.00
 ```
+
+Local `--file` and `--zip` paths must point at files inside `design-systems/`.
 
 You do not have to commit the file. You can also sell from a URL you control,
 from Google Drive, or from Dropbox by swapping the source flag:
@@ -117,12 +168,6 @@ Set the same environment variables in your host dashboard, use `NETWORK=base` wh
 https://yourdomain.com/.well-known/design-catalog.json
 https://yourdomain.com/catalog
 ```
-
-## What Is Planned
-
-Available today: local files in `design-systems/`, direct URL / your-domain sources, Google Drive sources, Dropbox Mode A share links, Dropbox Mode B private paths with OAuth env vars, CLI publishing, x402 payment checks, built-in Bazaar discovery metadata in `402` responses, and self-hosted deployment.
-
-Coming soon: iCloud/CloudKit assessment follow-through, OAuth-based Google Drive, no-terminal publishing, and stronger zero-touch external Bazaar indexing coverage.
 
 ## Safety Notes
 
