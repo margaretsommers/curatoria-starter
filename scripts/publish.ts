@@ -37,6 +37,8 @@
 import fs from 'fs';
 import path from 'path';
 
+const ROOT_DIR = path.resolve(__dirname, '..');
+
 // Resolve src modules relative to this script (handles both ts-node and compiled)
 const catalogPath = path.join(__dirname, '../src/catalog');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -106,7 +108,7 @@ try {
 if (!built.source && args.file) {
   const filePath = path.isAbsolute(args.file)
     ? args.file
-    : path.resolve(process.cwd(), args.file);
+    : path.resolve(ROOT_DIR, args.file);
   if (!fs.existsSync(filePath)) {
     console.error(`\nFile not found: ${filePath}`);
     console.error('Make sure the .md file exists in the design-systems/ directory first.\n');

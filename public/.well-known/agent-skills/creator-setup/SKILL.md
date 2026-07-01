@@ -30,7 +30,7 @@ If `.env` does not exist, run Phase 1 wallet setup first.
 | Phase | Goal | Chapter |
 | --- | --- | --- |
 | 1 — Wallet | Configure payout wallet (CDP-first), write `.env`, fund test wallet | `docs/creator/02-wallet-basics.md` |
-| 2 — Storage | Place product files in `design-systems/` (cloud connectors are planned, not built) | `docs/creator/03-connect-your-storage.md` |
+| 2 — Storage | Place product files in `design-systems/` or publish from URL, Google Drive, or Dropbox | `docs/creator/03-connect-your-storage.md` |
 | 3 — Publish | Publish markdown and/or bundle products with CLI, verify catalog | `docs/creator/04-products-and-prices.md` |
 | 4 — Bazaar | Verify catalog URL, confirm built-in 402 metadata, share catalog links manually | `docs/creator/08-bazaar-listing.md` |
 | 5 — Testnet Proof | Run `npm run bug-bash -- --local`, confirm Markdown + bundle 402, optional paid proof | `docs/creator/06-test-on-testnet.md` |
@@ -81,7 +81,7 @@ Stop here if `network` is wrong or `wallet` is missing.
 
 **Read `docs/creator/03-connect-your-storage.md` before proceeding.**
 
-Today, sellable files live in `design-systems/`. Cloud storage connectors are planned but not built.
+Today, sellable files can live in `design-systems/` or stay in cloud storage you already use. Local folder is the default; URL, Google Drive, and Dropbox sources are available via publish flags.
 
 Creator workflow:
 1. Export or copy the finished `.md` or `.zip` file to the local machine.

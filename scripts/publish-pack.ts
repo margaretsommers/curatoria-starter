@@ -34,6 +34,8 @@
 import fs from 'fs';
 import path from 'path';
 
+const ROOT_DIR = path.resolve(__dirname, '..');
+
 // Resolve src modules relative to this script (handles both ts-node and compiled)
 const catalogPath = path.join(__dirname, '../src/catalog');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -97,7 +99,7 @@ try {
 
 // For local bundles, confirm the .zip is actually on disk before registering.
 if (!built.source && args.zip) {
-  const zipPath = path.isAbsolute(args.zip) ? args.zip : path.resolve(process.cwd(), args.zip);
+  const zipPath = path.isAbsolute(args.zip) ? args.zip : path.resolve(ROOT_DIR, args.zip);
   if (!fs.existsSync(zipPath)) {
     console.error(`\nZip file not found: ${zipPath}`);
     console.error('Make sure the bundle file exists first.\n');
