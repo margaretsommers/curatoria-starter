@@ -125,7 +125,10 @@ Expected:
 
 - `/health` returns JSON with `"status":"ok"` or equivalent healthy status.
 - `/.well-known/design-catalog.json` returns a full catalog with design systems.
-- `npm run smoke` exits 0.
+- `npm run smoke` exits 0 and includes `local fixture integrity`.
+- The fixture integrity line reports byte size and SHA-256 for local demo files.
+  In the starter export, it also validates PNG, PDF, JSON, font signatures, and
+  zip entries without parsing paid binary output through stdout.
 
 Result:
 
@@ -153,6 +156,11 @@ Expected:
 - Local service checks pass.
 - Catalog sanity checks pass.
 - Paid proof is not required for this first-time local test.
+- Any optional `awal` paid proof is only a settlement/challenge check unless it
+  exposes a safe signer handoff. Do not treat copied terminal output or
+  `awal x402 pay --json` body data as a valid binary asset download. The agent
+  downloader uses a fresh signer adapter/private-key proof path before saving
+  paid responses as raw bytes.
 
 Result:
 

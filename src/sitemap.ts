@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { Request, Response } from 'express';
 import { listActive, readCatalog } from './catalog';
 import { requestBaseUrl } from './discovery';
@@ -6,9 +7,17 @@ import { SITEMAP_PATH } from './paths';
 import { DesignSystemEntry } from './types';
 
 export const SITEMAP_OUTPUT_PATH = SITEMAP_PATH;
+const PUBLIC_DIR = path.join(__dirname, '../public');
 
-const STATIC_PAGES: Array<{ path: string; priority?: string }> = [
+const STATIC_PAGES: Array<{ path: string; priority?: string; files?: string[] }> = [
   { path: '/', priority: '1.0' },
+  { path: '/docs.html', priority: '0.8', files: ['docs.html'] },
+  { path: '/starter-guide.html', priority: '0.8', files: ['starter-guide.html'] },
+  { path: '/whitepaper', priority: '0.8', files: ['whitepaper/index.html', 'whitepaper.html'] },
+  { path: '/privacy.html', priority: '0.3', files: ['privacy.html'] },
+  { path: '/privacy-policy.html', priority: '0.3', files: ['privacy-policy.html'] },
+  { path: '/download.html', priority: '0.5', files: ['download.html'] },
+  { path: '/llms.txt', priority: '0.7', files: ['llms.txt'] },
   { path: '/auth.md', priority: '0.7' },
   { path: '/.well-known/agent-skills/index.json', priority: '0.7' },
   { path: '/.well-known/x402', priority: '0.8' },
@@ -28,6 +37,11 @@ function escapeXml(value: string): string {
 function productAccessPath(entry: DesignSystemEntry): string {
   const isBundle = (entry.resource_type ?? 'design_md') === 'bundle_zip';
   return isBundle ? `/packs/${entry.id}/download` : `/design-systems/${entry.id}`;
+}
+
+function publicFileExists(files: string[] | undefined): boolean {
+  if (!files) return true;
+  return files.some(file => fs.existsSync(path.join(PUBLIC_DIR, file)));
 }
 
 function formatLastmod(iso?: string): string | undefined {
@@ -53,7 +67,7 @@ export function buildSitemapXml(baseUrl: string): string {
   const origin = baseUrl.replace(/\/$/, '');
   const urls: Array<{ loc: string; lastmod?: string; priority?: string }> = [];
 
-  for (const page of STATIC_PAGES) {
+  for (const page of STATIC_PAGES.filter(page => publicFileExists(page.files))) {
     urls.push({
       loc: page.path === '/' ? `${origin}/` : `${origin}${page.path}`,
       priority: page.priority,

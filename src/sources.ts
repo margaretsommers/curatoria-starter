@@ -95,6 +95,53 @@ function basenameFromUrl(rawUrl: string, fallback: string): string {
   }
 }
 
+function resolveLocalSourcePath(localName: string): string {
+  if (!localName) {
+    throw new Error('Local source file cannot be empty.');
+  }
+
+  const filePath = path.resolve(DESIGN_SYSTEMS_DIR, localName);
+  const relative = path.relative(DESIGN_SYSTEMS_DIR, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Local source file escapes design-systems/: ${localName}`);
+  }
+
+  return filePath;
+}
+
+function isHtmlContentType(contentType?: string): boolean {
+  return (contentType ?? '').toLowerCase().split(';', 1)[0].trim() === 'text/html';
+}
+
+function looksLikeHtml(buffer: Buffer): boolean {
+  const prefix = buffer.subarray(0, 512).toString('utf8').trimStart().toLowerCase();
+  return (
+    prefix.startsWith('<!doctype html') ||
+    prefix.startsWith('<html') ||
+    prefix.startsWith('<head') ||
+    prefix.startsWith('<body')
+  );
+}
+
+function assertRawFileResponse(
+  buffer: Buffer,
+  contentType: string | undefined,
+  contentEncoding: string | undefined,
+  context: string,
+): void {
+  if (contentEncoding && contentEncoding.toLowerCase() !== 'identity') {
+    throw new Error(
+      `${context} responded with content-encoding "${contentEncoding}", so original bytes cannot be verified.`,
+    );
+  }
+
+  if (isHtmlContentType(contentType) || looksLikeHtml(buffer)) {
+    throw new Error(
+      `${context} returned an HTML page, not the file bytes. Check sharing permissions and use a raw download URL.`,
+    );
+  }
+}
+
 // ─── SSRF guard for the url connector ─────────────────────────────────────────
 
 function isPrivateIpv4(host: string): boolean {
@@ -142,7 +189,11 @@ async function fetchRemoteBytes(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { redirect: 'follow', signal: controller.signal });
+    const res = await fetch(url, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { Accept: 'application/octet-stream,*/*;q=0.8', 'Accept-Encoding': 'identity' },
+    });
     if (!res.ok) {
       throw new Error(`${context} responded ${res.status} ${res.statusText}`);
     }
@@ -155,13 +206,17 @@ async function fetchRemoteBytes(
     }
 
     const buffer = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get('content-type') ?? undefined;
+    const contentEncoding = res.headers.get('content-encoding') ?? undefined;
+    assertRawFileResponse(buffer, contentType, contentEncoding, context);
+
     if (buffer.byteLength > MAX_REMOTE_BYTES) {
       throw new Error(
         `${context} is ${buffer.byteLength} bytes, over the ${MAX_REMOTE_BYTES}-byte limit.`,
       );
     }
 
-    return { buffer, contentType: res.headers.get('content-type') ?? undefined };
+    return { buffer, contentType };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       throw new Error(`${context} timed out after ${FETCH_TIMEOUT_MS}ms.`);
@@ -309,6 +364,8 @@ async function fetchDropboxPathBytes(
       signal: controller.signal,
       headers: {
         Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream,*/*;q=0.8',
+        'Accept-Encoding': 'identity',
         'Dropbox-API-Arg': JSON.stringify({ path: dropboxPath }),
       },
     });
@@ -331,13 +388,17 @@ async function fetchDropboxPathBytes(
     }
 
     const buffer = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get('content-type') ?? undefined;
+    const contentEncoding = res.headers.get('content-encoding') ?? undefined;
+    assertRawFileResponse(buffer, contentType, contentEncoding, 'Dropbox source');
+
     if (buffer.byteLength > MAX_REMOTE_BYTES) {
       throw new Error(
         `Dropbox source is ${buffer.byteLength} bytes, over the ${MAX_REMOTE_BYTES}-byte limit.`,
       );
     }
 
-    return { buffer, contentType: res.headers.get('content-type') ?? undefined };
+    return { buffer, contentType };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       throw new Error(`Dropbox source timed out after ${FETCH_TIMEOUT_MS}ms.`);
@@ -366,14 +427,14 @@ export async function resolveResource(entry: DesignSystemEntry): Promise<Resolve
 
   if (sourceType === 'local') {
     const localName = entry.bundle_file ?? entry.file;
-    const filePath = path.join(DESIGN_SYSTEMS_DIR, localName);
+    const filePath = resolveLocalSourcePath(localName);
     if (!fs.existsSync(filePath)) {
       throw new Error(`Local source file not found on disk: ${localName}`);
     }
     return {
       buffer: fs.readFileSync(filePath),
       mimeType: entry.mime_type ?? defaultMimeFor(kind),
-      filename: localName,
+      filename: path.basename(localName),
       sourceType,
     };
   }
@@ -402,20 +463,7 @@ export async function resolveResource(entry: DesignSystemEntry): Promise<Resolve
     if (!GOOGLE_HOSTS.has(host)) {
       throw new Error(`Unexpected Google Drive host: ${host}`);
     }
-    const { buffer, contentType } = await fetchRemoteBytes(driveUrl, 'Google Drive source');
-
-    // Without an API key, a non-public or oversized file returns Google's HTML
-    // interstitial instead of bytes. Detect that and give a fixable error.
-    if (
-      !GOOGLE_API_KEY &&
-      (contentType ?? '').includes('text/html') &&
-      kind !== 'design_md'
-    ) {
-      throw new Error(
-        'Google Drive returned an HTML page, not the file. Share the file as ' +
-          '"Anyone with the link can view", or set GOOGLE_API_KEY for private/large files.',
-      );
-    }
+    const { buffer } = await fetchRemoteBytes(driveUrl, 'Google Drive source');
 
     return {
       buffer,

@@ -19,6 +19,8 @@ Before publishing, prepare:
 - A one-sentence description for the discovery catalog.
 - A price in USD, settled as USDC.
 - Search tags that help agents decide when the product is relevant.
+- A clear license stance. Use `custom-commercial` or `proprietary` for most paid assets; reserve Creative Commons / CC0 for previews, samples, or intentionally open assets.
+- Optional preview metadata that helps agents decide what to buy without revealing the paid payload.
 - The source file in `design-systems/`.
 
 Use lowercase letters, numbers, and hyphens for IDs. Avoid changing an ID after sharing it, because the ID becomes part of the paid URL.
@@ -107,6 +109,74 @@ Start with simple per-product prices while testing:
 
 On **Track B**, agents pay the catalog fee before they see product names, prices, and descriptions in `design_systems[]`. On **Track A**, they see that metadata for free at well-known. Either way, keep descriptions concrete — good catalog metadata helps agents decide which asset is worth buying without exposing paid file bytes.
 
+## Discovery Preview Metadata
+
+Agents need enough signal to buy intelligently, but the preview should not replace the paid product. Registry entries may include these optional public fields:
+
+```json
+{
+  "license": "custom-commercial",
+  "license_url": "https://example.com/license",
+  "license_summary": "Paid commercial use for one buyer workspace.",
+  "preview": "Short partial excerpt or product summary.",
+  "preview_url": "https://example.com/previews/starter-bundle",
+  "sample_files": ["samples/colors.sample.json"],
+  "table_of_contents": ["Tokens", "Components", "Usage"],
+  "token_categories": ["color", "spacing", "typography"],
+  "component_list": ["Button", "Card", "Modal"],
+  "content_sha256": "64-character-sha256-when-known",
+  "bundle_manifest": [
+    {
+      "path": "tokens/colors.json",
+      "kind": "tokens",
+      "mime_type": "application/json",
+      "bytes": 2048,
+      "sha256": "optional-file-sha256"
+    }
+  ]
+}
+```
+
+Keep `preview`, `preview_url`, `sample_files`, and `bundle_manifest` intentionally partial. A manifest can list safe filenames, categories, byte counts, and hashes; it must not include Drive, Dropbox, CDN source URLs, signed URLs, credentials, or enough raw content to reconstruct the paid bundle.
+
+Use `content_sha256` when you know the exact paid payload hash. Paid responses also expose `X-Content-Sha256` when this registry value is present, so buyer agents can compare discovery metadata with the bytes they saved locally.
+
+### License Defaults
+
+For paid Curatoria assets, prefer `custom-commercial` or `proprietary` with a `license_url` that states what the buyer can do after payment. Payment should buy rights, provenance, and auditability, not just bytes.
+
+Creative Commons and CC0 are better for public previews, samples, or deliberately open products:
+
+- `cc0-1.0`: public-domain dedication; good for free samples, poor for paid exclusivity.
+- `cc-by-4.0`: commercial reuse allowed with attribution.
+- `cc-by-sa-4.0`: commercial reuse allowed with attribution and share-alike.
+- `cc-by-nd-4.0`: redistribution allowed, but no derivatives.
+- `cc-by-nc-*`: non-commercial only; usually a poor fit for commercial agent buyers.
+
+MIT and Apache-2.0 are software licenses. Use them for code assets when appropriate, not as the default for design, media, or bundle rights.
+
+## Large Files And Disposable Access
+
+Direct paid download remains the primary path. For `.psd` files and other large binaries, Curatoria should treat payloads as opaque bytes: preserve the filename and MIME type, stream/save raw bytes, and verify byte count plus SHA-256 when available. Do not parse, flatten, preview, transcode, or reconstruct large binaries from terminal output.
+
+Disposable paid links are designed as a fallback for files that exceed direct download limits or time out. The schema can describe a creator's intended limits:
+
+```json
+{
+  "disposable_access": {
+    "enabled": true,
+    "max_downloads": 1,
+    "max_views": 1,
+    "hours_valid": 24,
+    "max_total_bytes": 1073741824,
+    "allow_regeneration_after_payment": true,
+    "delivery": "fallback_when_direct_too_large"
+  }
+}
+```
+
+This pass defines the metadata and server-side limit logic, but it does not ship a public disposable-link route. A production route still needs payment-bound link issuance, unguessable tokens, persisted counters, expiry enforcement, and byte-safe proxying that never exposes the original Drive, Dropbox, or source URL.
+
 ### Catalog access price (Track B only)
 
 Default `$0.001` USDC per `GET /catalog` is enough to monetize discovery without blocking serious buyers. Raise it only when you have a reason (high-value catalogs, anti-scrape posture). Lower values still settle through x402; do not set `0` expecting a free paid route — use Track A customization if you want a free full listing.
@@ -125,6 +195,9 @@ You can edit `design-systems/.registry.json` directly when needed. Each active p
   "description": "Starter demo product",
   "price_usd": "0.01",
   "tags": ["demo", "starter"],
+  "license": "custom-commercial",
+  "license_summary": "Paid commercial use under the linked terms.",
+  "preview": "Short partial preview for discovery.",
   "published_at": "2026-01-01T00:00:00.000Z",
   "active": true
 }

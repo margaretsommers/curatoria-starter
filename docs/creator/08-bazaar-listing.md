@@ -113,7 +113,7 @@ Even with CDP auto-index, make agents aware of your service:
 - include catalog and product URLs in launch posts and demos
 - keep endpoints stable so agents can revisit them
 
-[Agentic.Market](https://agentic.market) surfaces Bazaar services automatically; curated/featured placement is Coinbase discretion. MCP sellers use a separate submission flow at [agenticmarket.dev](https://agenticmarket.dev) — not applicable to HTTP x402 catalogs.
+[Agentic.Market](https://agentic.market) surfaces Bazaar services automatically; curated/featured placement is Coinbase discretion. MCP is a separate agent-tool packaging layer, not the first proof for a Curatoria starter catalog.
 
 ## What Is Not Guaranteed Yet
 

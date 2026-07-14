@@ -2,6 +2,9 @@
  * Shared smoke checks for local smoke and bug-bash scripts.
  */
 
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 import { isPaymentRequiredV2, validatePaymentRequired } from '@x402/core/schemas';
@@ -22,6 +25,8 @@ export type PaidCheckTarget = {
 const DEFAULT_MARKDOWN_ID = 'curatoria-demo-md';
 const DEFAULT_BUNDLE_ID = 'curatoria-demo-pack';
 const AWAL_PACKAGE = 'awal@2.10.0';
+const ROOT_DIR = path.resolve(__dirname, '..');
+const DESIGN_SYSTEMS_DIR = path.join(ROOT_DIR, 'design-systems');
 
 export async function checkHealth(baseUrl: string): Promise<CheckResult> {
   const res = await fetch(`${baseUrl}/health`);
@@ -310,14 +315,57 @@ export async function checkUnpaidBundle402(
 }
 
 export async function checkHumanPages(baseUrl: string): Promise<CheckResult[]> {
-  const res = await fetch(`${baseUrl}/`);
-  return [
-    {
-      name: 'home page',
-      ok: res.ok,
-      detail: `status ${res.status}`,
-    },
+  const pages = [
+    { name: 'home page', path: '/' },
+    { name: 'docs page', path: '/docs.html' },
   ];
+
+  return Promise.all(
+    pages.map(async ({ name, path }) => {
+      const res = await fetch(`${baseUrl}${path}`);
+      return {
+        name,
+        ok: res.ok,
+        detail: `status ${res.status}`,
+      };
+    }),
+  );
+}
+
+export async function checkLocalFixtureIntegrity(): Promise<CheckResult> {
+  const required = [
+    validateFixture('curatoria-demo-md.md', 'markdown', true),
+    validateFixture('curatoria-demo-pack.zip', 'zip', true),
+  ];
+  const optional = [
+    validateFixture('curatoria-demo-image.png', 'png', false),
+    validateFixture('curatoria-demo-doc.pdf', 'pdf', false),
+    validateFixture('curatoria-demo-tokens.json', 'json', false),
+    validateFixture('curatoria-demo-font.woff2', 'font', false),
+  ];
+
+  const checks = [...required, ...optional];
+  const failures = checks.filter((check) => check.required && !check.ok);
+  const present = checks.filter((check) => check.present);
+  const missingOptional = checks.filter((check) => !check.required && !check.present);
+
+  if (failures.length > 0) {
+    return {
+      name: 'local fixture integrity',
+      ok: false,
+      detail: failures.map((check) => check.detail).join('; '),
+    };
+  }
+
+  return {
+    name: 'local fixture integrity',
+    ok: true,
+    detail:
+      `${present.map((check) => check.detail).join('; ')}` +
+      (missingOptional.length > 0
+        ? `; optional absent: ${missingOptional.map((check) => check.filename).join(', ')}`
+        : ''),
+  };
 }
 
 export async function runSmokeChecks(
@@ -332,6 +380,7 @@ export async function runSmokeChecks(
     await checkCatalogPerFetch402(baseUrl),
     await checkUnpaidMarkdown402(baseUrl, options.markdownId),
     await checkUnpaidBundle402(baseUrl, options.bundleId),
+    await checkLocalFixtureIntegrity(),
   ];
 }
 
@@ -648,4 +697,160 @@ function shortAddress(address?: string): string {
   if (!address) return 'missing';
   if (address.length < 10) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+type FixtureKind = 'markdown' | 'zip' | 'png' | 'pdf' | 'json' | 'font';
+
+type FixtureValidation = {
+  filename: string;
+  required: boolean;
+  present: boolean;
+  ok: boolean;
+  detail: string;
+};
+
+function validateFixture(
+  filename: string,
+  kind: FixtureKind,
+  required: boolean,
+): FixtureValidation {
+  const filePath = path.join(DESIGN_SYSTEMS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return {
+      filename,
+      required,
+      present: false,
+      ok: !required,
+      detail: `${filename} missing`,
+    };
+  }
+
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const hash = sha256(buffer).slice(0, 12);
+    const size = buffer.byteLength;
+    const kindDetail = validateBytes(filename, kind, buffer);
+    return {
+      filename,
+      required,
+      present: true,
+      ok: true,
+      detail: `${filename} ${size}B sha256:${hash} ${kindDetail}`,
+    };
+  } catch (err) {
+    return {
+      filename,
+      required,
+      present: true,
+      ok: false,
+      detail: `${filename} invalid: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+function validateBytes(filename: string, kind: FixtureKind, buffer: Buffer): string {
+  if (buffer.byteLength === 0) {
+    throw new Error('file is empty');
+  }
+
+  if (kind === 'markdown') {
+    if (buffer.includes(0)) {
+      throw new Error('markdown contains NUL bytes');
+    }
+    const text = buffer.toString('utf8');
+    if (text.includes('\uFFFD')) {
+      throw new Error('markdown is not clean UTF-8 text');
+    }
+    if (text.trim().length < 20) {
+      throw new Error('markdown content is unexpectedly short');
+    }
+    return 'markdown readable';
+  }
+
+  if (kind === 'zip') {
+    if (!hasZipSignature(buffer)) {
+      throw new Error('missing PK zip signature');
+    }
+    const entries = listZipEntries(buffer);
+    const requiredEntries = ['README.md', 'tokens.json'];
+    const missing = requiredEntries.filter((entry) => !entries.includes(entry));
+    if (missing.length > 0) {
+      throw new Error(`zip missing ${missing.join(', ')}`);
+    }
+    return `zip entries:${entries.join('|')}`;
+  }
+
+  if (kind === 'png') {
+    const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    if (!buffer.subarray(0, pngSignature.length).equals(pngSignature)) {
+      throw new Error('missing PNG signature');
+    }
+    const width = buffer.readUInt32BE(16);
+    const height = buffer.readUInt32BE(20);
+    return `png ${width}x${height}`;
+  }
+
+  if (kind === 'pdf') {
+    if (!buffer.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+      throw new Error('missing PDF signature');
+    }
+    return 'pdf signature ok';
+  }
+
+  if (kind === 'json') {
+    JSON.parse(buffer.toString('utf8'));
+    return 'json parses without rewrite';
+  }
+
+  if (kind === 'font') {
+    const signature = buffer.subarray(0, 4).toString('latin1');
+    if (!['wOF2', 'wOFF', 'OTTO', '\x00\x01\x00\x00'].includes(signature)) {
+      throw new Error(`unexpected font signature ${JSON.stringify(signature)}`);
+    }
+    return `font signature:${signature === '\x00\x01\x00\x00' ? 'ttf' : signature}`;
+  }
+
+  throw new Error(`unknown fixture kind for ${filename}`);
+}
+
+function hasZipSignature(buffer: Buffer): boolean {
+  return (
+    buffer.byteLength >= 4 &&
+    buffer[0] === 0x50 &&
+    buffer[1] === 0x4b &&
+    [0x03, 0x05, 0x07].includes(buffer[2]) &&
+    [0x04, 0x06, 0x08].includes(buffer[3])
+  );
+}
+
+function listZipEntries(buffer: Buffer): string[] {
+  const entries: string[] = [];
+  let offset = 0;
+  while (offset <= buffer.byteLength - 46) {
+    if (buffer.readUInt32LE(offset) !== 0x02014b50) {
+      offset += 1;
+      continue;
+    }
+    const nameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    const nameStart = offset + 46;
+    const nameEnd = nameStart + nameLength;
+    if (nameEnd > buffer.byteLength) {
+      throw new Error('zip central directory is truncated');
+    }
+    const name = buffer.subarray(nameStart, nameEnd).toString('utf8');
+    if (name && !name.endsWith('/')) {
+      entries.push(name);
+    }
+    offset = nameEnd + extraLength + commentLength;
+  }
+  if (entries.length === 0) {
+    throw new Error('zip central directory has no file entries');
+  }
+  return entries;
+}
+
+function sha256(buffer: Buffer): string {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
 }

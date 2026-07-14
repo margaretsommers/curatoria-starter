@@ -12,6 +12,7 @@
     "smoke": "ts-node ../../scripts/smoke.ts",
     "check-dns-aid": "ts-node ../../scripts/check-dns-aid.ts",
     "bug-bash": "ts-node ../../scripts/bug-bash.ts",
+    "agent-download": "ts-node ../../scripts/agent-download.ts",
     "build": "tsc -p ../../tsconfig.json"
   },
   "dependencies": {

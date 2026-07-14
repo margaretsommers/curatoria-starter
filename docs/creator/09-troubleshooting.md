@@ -137,7 +137,7 @@ If you do not see `402 Payment Required`, check:
 
 - You are calling a paid route (`/design-systems/:id`, `/packs/:id/download`, or unpaid `/catalog` on Track B) — not the free well-known teaser.
 - The product exists and is active.
-- The server is running the Curatoria service with `npm run dev`.
+- The server is running the Curatoria service with `npm run dev`, not only the static site workspace.
 
 ## Paid Request Fails
 
@@ -151,6 +151,62 @@ Check:
 - `FACILITATOR_URL` is reachable.
 
 For testnet, use Base Sepolia ETH and Base Sepolia USDC. Mainnet USDC on another chain will not satisfy a Base Sepolia test payment.
+
+## Paid Download Cannot Be Saved Locally
+
+A successful paid asset response should be saved as raw bytes by the buyer
+client. Text assets, zip bundles, images, PDFs, JSON files, and fonts must not be
+copied from terminal output, reconstructed by an agent, or parsed from a JSON
+string body.
+
+Use a browser or client flow that handles the paid response as an `ArrayBuffer`,
+`Blob`, or raw stream, then saves it with the filename from `Content-Disposition`
+when present. After saving:
+
+- Markdown should open as readable UTF-8 text.
+- Zip bundles should unzip and keep their internal files/directories.
+- PNG/PDF/font assets should keep their file signatures.
+- JSON should match the original bytes; do not reformat it as a verification
+  step.
+- PSD and other large design binaries should be treated as opaque bytes. Preserve
+  the filename/MIME type and verify byte count plus SHA-256 when available; do
+  not parse, flatten, transcode, or reconstruct the file in the buyer flow.
+
+Debug path status: `awal x402 pay --json` can prove that settlement and route
+access work, but it is not a binary-safe local-file download path unless it
+exposes a safe signer handoff. Do not use its stdout or JSON body as the source
+of a saved zip, image, PDF, or font. For agent-first local saves, use a downloader
+or client adapter that creates a fresh x402 payment payload for the validated
+resource before fetching raw bytes.
+
+If a source exceeds `STORAGE_MAX_BYTES` or times out, direct paid delivery should
+fail clearly instead of asking an agent to copy/rebuild bytes. Disposable paid
+links are the intended fallback for that case, with creator-configured download
+counts, view counts, expiry hours, and optional total bytes. The current backend
+defines the schema and limit logic, but it does not yet expose a public
+disposable-link route; do not claim large-file fallback is live until issuance,
+storage, and counter persistence are wired.
+
+## Work-Machine Decision Tree
+
+If a buyer is on a corporate or school machine and downloads fail, separate the
+failure before changing product settings:
+
+1. **No wallet/payment prompt or wallet cannot sign:** the machine or browser may
+   block wallet extensions, popups, passkeys, or Coinbase/CDP domains. Retry from
+   a personal browser profile or network.
+2. **Payment succeeds but the route returns `500`/`502`:** check server logs for
+   source-fetch errors. Google Drive or Dropbox may be blocked, expired, moved,
+   or returning an HTML preview page instead of file bytes.
+3. **Payment succeeds but the saved file is corrupted:** confirm the buyer flow
+   saved raw response bytes. Terminal copying, JSON body parsing, or agent
+   reconstruction will corrupt binary assets.
+4. **Only external-storage products fail:** switch one product temporarily to a
+   local `design-systems/` file or your own direct HTTPS URL. If that works, the
+   issue is the Drive/Dropbox/source-host path, not x402 settlement.
+5. **Only production fails:** confirm `PUBLIC_BASE_URL`, `NETWORK`,
+   `FACILITATOR_URL`, source permissions, and any `GOOGLE_API_KEY`/Dropbox env
+   vars are set in the deployed host, not just local `.env`.
 
 ## Publish Command Fails
 

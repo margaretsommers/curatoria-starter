@@ -18,6 +18,33 @@ where it is and is fetched on demand only after a buyer pays.
 All source options above are available today and use the same `npm run publish-design` and
 `npm run publish-pack` commands — you just swap which source flag you pass.
 
+## Reliability stance
+
+For byte-for-byte paid downloads, the best source is the one that gives Curatoria
+the fewest chances to receive an HTML preview, login page, expired link, or
+rewritten payload.
+
+- **Recommended default:** local files under `design-systems/` for small starter
+  products, or direct `https://` files from a domain/CDN/object store you
+  control. These paths give you the clearest byte control and easiest hashes.
+- **Acceptable with caveats:** Dropbox Mode A share links. They are easy to set
+  up and Curatoria rewrites them to raw-download links, but the share URL is a
+  bearer secret: anyone who gets the link can bypass your paywall.
+- **Stronger but more setup-heavy:** Dropbox Mode B private paths with OAuth.
+  This avoids public share links, but depends on refresh-token setup and Dropbox
+  API availability at purchase time.
+- **Supported with Drive-specific caveats:** Google Drive keyless public links
+  work for many files, but Drive can return HTML interstitials or preview pages,
+  especially for large or permission-limited files.
+- **Preferred Drive mode:** Google Drive with `GOOGLE_API_KEY` and Drive API
+  enabled when you need Drive reliability. It is still a remote dependency, so
+  keep file permissions, API key restrictions, and host logs in your launch
+  checklist.
+
+Corporate networks can block wallets, Coinbase/CDP, Google Drive, Dropbox, or
+your source host. If a buyer pays successfully but delivery fails, check the
+server logs for source-fetch errors before assuming the x402 settlement failed.
+
 ## Option A — Local folder (default)
 
 Keep the sellable file inside `design-systems/` and publish it by path:

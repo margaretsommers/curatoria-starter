@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { readCatalog, listActive } from './catalog';
-import { CatalogEntry, CatalogResponse, CatalogTeaserResponse } from './types';
+import { CatalogEntry, CatalogResponse, CatalogTeaserResponse, DesignSystemEntry } from './types';
 
 /**
  * GET /.well-known/design-catalog.json  (also aliased to GET /design-systems, GET /catalog)
@@ -49,28 +49,31 @@ export function buildFullCatalogResponse(req: Request): CatalogResponse {
   const catalog = readCatalog();
   const baseUrl = requestBaseUrl(req);
 
-  const entries: CatalogEntry[] = listActive().map(({ file: _file, source: _source, ...rest }) => {
-    const resourceType = rest.resource_type ?? 'design_md';
-    const isBundle = resourceType === 'bundle_zip';
-    const accessUrl = isBundle
-      ? `${baseUrl}/packs/${rest.id}/download`
-      : `${baseUrl}/design-systems/${rest.id}`;
-
-    return {
-      ...rest,
-      resource_type: resourceType,
-      mime_type: rest.mime_type ?? (isBundle ? 'application/zip' : 'text/markdown'),
-      access_url: accessUrl,
-      download_url: isBundle ? accessUrl : undefined,
-      payment_required: true,
-    };
-  });
+  const entries: CatalogEntry[] = listActive().map(entry => buildCatalogEntry(entry, baseUrl));
 
   return {
     owner: catalog.owner,
     total: entries.length,
     base_url: baseUrl,
     design_systems: entries,
+  };
+}
+
+export function buildCatalogEntry(entry: DesignSystemEntry, baseUrl: string): CatalogEntry {
+  const { file: _file, source: _source, ...rest } = entry;
+  const resourceType = rest.resource_type ?? 'design_md';
+  const isBundle = resourceType === 'bundle_zip';
+  const accessUrl = isBundle
+    ? `${baseUrl}/packs/${rest.id}/download`
+    : `${baseUrl}/design-systems/${rest.id}`;
+
+  return {
+    ...rest,
+    resource_type: resourceType,
+    mime_type: rest.mime_type ?? (isBundle ? 'application/zip' : 'text/markdown'),
+    access_url: accessUrl,
+    download_url: isBundle ? accessUrl : undefined,
+    payment_required: true,
   };
 }
 

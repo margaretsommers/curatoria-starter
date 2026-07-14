@@ -1,0 +1,10 @@
+{
+  "color": {
+    "primary": "#4F46E5",
+    "background": "#FFFFFF"
+  },
+  "spacing": {
+    "unit": "4px"
+  },
+  "source": "curatoria-starter-fixture"
+}

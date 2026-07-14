@@ -25,14 +25,18 @@ test('wantsMarkdown honors Accept content negotiation', () => {
 test('htmlToAgentMarkdown converts homepage HTML to markdown with frontmatter', () => {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf-8');
   const markdown = htmlToAgentMarkdown(html);
+  const title = html.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim();
 
-  assert.match(markdown, /^---\ntitle: Curatoria Starter\n---\n\n/);
-  assert.match(markdown, /# Curatoria Starter/);
-  assert.match(markdown, /README on GitHub/);
-  assert.match(markdown, /\[Catalog\]\(\/.well-known\/design-catalog\.json\)/);
+  assert.ok(title);
+  assert.match(markdown, new RegExp(`^---\\ntitle: ${escapeRegExp(title)}\\n---\\n\\n`));
+  assert.match(markdown, new RegExp(escapeRegExp(title)));
   assert.doesNotMatch(markdown, /<html/i);
 });
 
 test('estimateMarkdownTokens returns a positive estimate', () => {
   assert.ok(estimateMarkdownTokens('hello world') >= 1);
 });
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

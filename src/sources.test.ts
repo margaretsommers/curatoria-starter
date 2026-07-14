@@ -76,6 +76,116 @@ test('resolveResource fetches Dropbox share-link bytes directly', async () => {
   }
 });
 
+test('resolveResource rejects direct URL HTML responses before delivery', async () => {
+  const prevFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () =>
+      new Response('<!doctype html><title>Preview</title>', {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      })) as typeof fetch;
+
+    await assert.rejects(
+      () =>
+        resolveResource({
+          id: 'url-doc',
+          file: 'url-doc.md',
+          name: 'URL Doc',
+          description: '',
+          price_usd: '0.05',
+          tags: [],
+          published_at: new Date().toISOString(),
+          active: true,
+          source: { type: 'url', url: 'https://files.example.com/url-doc.md' },
+        }),
+      /returned an HTML page, not the file bytes/,
+    );
+  } finally {
+    globalThis.fetch = prevFetch;
+  }
+});
+
+test('resolveResource rejects Google Drive HTML for markdown sources', async () => {
+  const prevFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () =>
+      new Response('<html><body>Google Drive interstitial</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      })) as typeof fetch;
+
+    await assert.rejects(
+      () =>
+        resolveResource({
+          id: 'drive-doc',
+          file: 'drive-doc.md',
+          name: 'Drive Doc',
+          description: '',
+          price_usd: '0.05',
+          tags: [],
+          published_at: new Date().toISOString(),
+          active: true,
+          source: { type: 'gdrive', file_id: 'abc123' },
+        }),
+      /returned an HTML page, not the file bytes/,
+    );
+  } finally {
+    globalThis.fetch = prevFetch;
+  }
+});
+
+test('resolveResource rejects encoded remote responses because raw bytes are not verifiable', async () => {
+  const prevFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () =>
+      new Response('encoded-bytes', {
+        status: 200,
+        headers: {
+          'content-type': 'application/zip',
+          'content-encoding': 'gzip',
+        },
+      })) as typeof fetch;
+
+    await assert.rejects(
+      () =>
+        resolveResource({
+          id: 'encoded-zip',
+          file: 'encoded-zip.zip',
+          bundle_file: 'encoded-zip.zip',
+          resource_type: 'bundle_zip',
+          mime_type: 'application/zip',
+          name: 'Encoded Zip',
+          description: '',
+          price_usd: '0.05',
+          tags: [],
+          published_at: new Date().toISOString(),
+          active: true,
+          source: { type: 'url', url: 'https://files.example.com/encoded-zip.zip' },
+        }),
+      /original bytes cannot be verified/,
+    );
+  } finally {
+    globalThis.fetch = prevFetch;
+  }
+});
+
+test('resolveResource rejects local files outside design-systems', async () => {
+  await assert.rejects(
+    () =>
+      resolveResource({
+        id: 'escape',
+        file: '../package.json',
+        name: 'Escape',
+        description: '',
+        price_usd: '0.05',
+        tags: [],
+        published_at: new Date().toISOString(),
+        active: true,
+      }),
+    /escapes design-systems/,
+  );
+});
+
 test('buildSource stores Dropbox share URL and enforces exclusivity', () => {
   const built = buildSource({
     id: 'dropbox-doc',

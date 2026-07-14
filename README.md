@@ -55,10 +55,12 @@ Optional **Track B** (`CATALOG_PAYWALL_ENABLED=1`) makes `GET /catalog` paid and
 
 - A working x402 paywall service on `npm run dev`
 - Generic demo products in `design-systems/`: one Markdown file and one zip bundle
+- Small raw-byte fixtures for smoke coverage: PNG, PDF, JSON, and WOFF2 signature checks
 - A free full catalog at `/.well-known/design-catalog.json` and `GET /catalog` (Track A default); pay per asset only
-- A minimal root page at `/` with links to the catalog and setup docs on GitHub
+- A root URL that redirects to `/docs.html` for setup docs
 - A first-time tester checklist in `TESTING.md`
 - Publish scripts for markdown design systems and downloadable packs
+- `npm run agent-download` for catalog validation, spend checks, fresh x402 signing, and binary-safe local file saves with a controlled test-wallet signer
 - `npm run bug-bash` checks for health, free catalog at well-known, unpaid asset 402, and Bazaar metadata
 - Starter policy guidance in `docs/acceptable-use-and-content-ownership.md`
 
@@ -100,7 +102,7 @@ If you are testing this starter for Curatoria, use `TESTING.md` before the Quick
 
 Open:
 
-- Service landing: `http://localhost:3000/` (catalog links plus GitHub setup guide)
+- Docs redirect: `http://localhost:3000/` -> `http://localhost:3000/docs.html`
 - Discovery catalog: `http://localhost:3000/.well-known/design-catalog.json` (full `design_systems[]` with prices and access_url)
 - Catalog alias: `curl http://localhost:3000/catalog` (expect `200` with same listing)
 - Markdown paywall check: `http://localhost:3000/design-systems/curatoria-demo-md`
@@ -111,6 +113,26 @@ Unpaid asset routes should return `402 Payment Required` until a valid x402 paym
 ```bash
 npm run bug-bash -- --local
 ```
+
+`npm run smoke` also checks local fixture integrity without touching paid stdout:
+Markdown readability, zip central-directory entries, PNG/PDF/font signatures,
+JSON parsing, byte sizes, and SHA-256 hashes. For paid binary assets, do not copy
+terminal output or parse `awal x402 pay --json` response bodies as file content.
+Use a browser or client flow that saves the paid response as raw bytes
+(`ArrayBuffer`, `Blob`, or stream).
+
+For the agent-first path, start with a dry run:
+
+```bash
+npm run agent-download -- --catalog http://localhost:3000/.well-known/design-catalog.json \
+  --product-id curatoria-demo-md --allow-domain localhost --dry-run
+```
+
+To save paid bytes locally, provide a binary-safe signer such as a funded test
+wallet private key in an environment variable. The downloader creates a fresh
+x402 payment payload for the validated resource before the paid retry; do not
+use durable `PAYMENT-SIGNATURE` values, terminal output, or `awal --json` bodies
+as downloaded files.
 
 ## Replace The Demo Products
 

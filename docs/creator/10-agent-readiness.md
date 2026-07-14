@@ -59,6 +59,20 @@ These routes are registered in `src/server.ts` when you deploy. No extra code re
 
 ---
 
+## MCP in plain words
+
+MCP is useful packaging for agents later. It is not the P0 marketplace or payment proof.
+
+For Curatoria, the split is simple:
+
+- **Coinbase owns payment:** wallet authentication, funds, x402 challenge payment, and settlement.
+- **Curatoria owns buying logic:** catalog interpretation, product selection, save destination, file validation, and proof output.
+- **Creators own supply:** each starter deployment is one creator's catalog unless you deliberately build an aggregator.
+
+A future Curatoria MCP could expose tools like `search_catalog`, `buy_asset`, `verify_download`, and `explain_receipt`. Build that after the basic proof works: one agent reads one catalog, pays for one asset, saves the file locally, and reports proof.
+
+---
+
 ## What you add in `public/`
 
 Copy or adapt these files onto your deployed domain (same origin as the service).

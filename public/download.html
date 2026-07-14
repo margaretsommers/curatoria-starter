@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5efe3" />
+    <title>Download Assets - Curatoria Starter</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .download-hero {
+        margin-bottom: 2rem;
+      }
+
+      .download-copy {
+        max-width: 720px;
+      }
+
+      .download-notice,
+      .download-card,
+      .download-proof {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.42);
+      }
+
+      .download-notice {
+        margin-bottom: 1rem;
+        padding: 1rem;
+        color: var(--muted);
+      }
+
+      .download-notice[data-kind="error"],
+      .download-status[data-kind="error"] {
+        color: #8a2d1f;
+      }
+
+      .download-notice[data-kind="success"],
+      .download-status[data-kind="success"] {
+        color: #35643d;
+      }
+
+      .download-list {
+        display: grid;
+        gap: 1rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .download-proof {
+        margin: 0 0 1rem;
+        padding: 1.1rem;
+      }
+
+      .download-proof h2 {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+
+      .download-proof ol {
+        margin: 0.75rem 0 0;
+        padding-left: 1.25rem;
+      }
+
+      .download-proof li + li {
+        margin-top: 0.4rem;
+      }
+
+      .download-card {
+        padding: 1.1rem;
+      }
+
+      .download-card__header {
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+      }
+
+      .download-card h2 {
+        margin: 0;
+        font-size: 1.3rem;
+      }
+
+      .download-card p {
+        margin: 0.55rem 0 0;
+      }
+
+      .download-kicker,
+      .download-meta,
+      .download-status,
+      .download-button,
+      .download-link {
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+
+      .download-kicker {
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .download-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.85rem;
+        color: var(--muted);
+        font-size: 0.76rem;
+      }
+
+      .download-meta span {
+        border: 1px solid rgba(124, 77, 29, 0.18);
+        border-radius: 999px;
+        padding: 0.22rem 0.5rem;
+      }
+
+      .download-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+
+      .download-button {
+        border: 1px solid var(--accent);
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fffaf0;
+        padding: 0.55rem 0.85rem;
+        cursor: pointer;
+        font-size: 0.82rem;
+      }
+
+      .download-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+      }
+
+      .download-link,
+      .download-status {
+        font-size: 0.82rem;
+      }
+
+      .download-status {
+        min-height: 1.25rem;
+        margin-top: 0.8rem;
+        color: var(--muted);
+      }
+
+      @media (max-width: 640px) {
+        .download-card__header {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="topbar" aria-label="Primary navigation">
+        <a class="brand" href="./docs.html">Curatoria Starter</a>
+        <div class="nav-links">
+          <a href="./docs.html">Docs</a>
+          <a href="https://github.com/margaretsommers/curatoria-starter" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </nav>
+
+      <article class="panel docs">
+        <section class="download-hero" aria-labelledby="download-title">
+          <p class="download-kicker">Diagnostics / buyer dogfood</p>
+          <h1 id="download-title">Debug paid delivery, not the primary buying path.</h1>
+          <p class="lede download-copy">
+            The primary path is agent-first: an agent reads the catalog, verifies the payment
+            challenge, pays, saves the file locally, and reports proof. This starter-safe browser
+            page stays as a diagnostics surface for catalog, payment, and byte-preserving delivery.
+          </p>
+        </section>
+
+        <section class="download-proof" aria-labelledby="agent-proof-title">
+          <h2 id="agent-proof-title">Intended agent proof</h2>
+          <ol>
+            <li>Read <code>/.well-known/design-catalog.json</code> and choose a paid asset.</li>
+            <li>Request its paid route and verify the <code>402</code> amount, resource, network, and <code>payTo</code>.</li>
+            <li>Pay with an agent wallet, fetch the paid response as raw bytes, and write those bytes to a local path.</li>
+            <li>Report saved path, byte count, MIME type, SHA-256, and payment transaction.</li>
+          </ol>
+        </section>
+
+        <aside class="download-notice" id="download-notice">
+          Loading catalog...
+        </aside>
+
+        <ul class="download-list" id="download-list" aria-live="polite"></ul>
+      </article>
+    </main>
+    <script src="./x402-payment-adapter.js"></script>
+    <script type="module" src="./download.js"></script>
+  </body>
+</html>

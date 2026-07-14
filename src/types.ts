@@ -2,6 +2,51 @@
 
 export type ResourceType = 'design_md' | 'bundle_zip';
 
+export type LicenseCode =
+  | 'proprietary'
+  | 'custom-commercial'
+  | 'cc0-1.0'
+  | 'cc-by-4.0'
+  | 'cc-by-sa-4.0'
+  | 'cc-by-nd-4.0'
+  | 'cc-by-nc-4.0'
+  | 'cc-by-nc-sa-4.0'
+  | 'cc-by-nc-nd-4.0'
+  | 'mit'
+  | 'apache-2.0'
+  | (string & {});
+
+export interface BundleManifestEntry {
+  /** Safe relative path inside the paid bundle. Never include source URLs. */
+  path: string;
+  kind?: string;
+  mime_type?: string;
+  bytes?: number;
+  sha256?: string;
+  description?: string;
+}
+
+export type DisposableAccessDeliveryMode =
+  | 'fallback_when_direct_too_large'
+  | 'disposable_link_only';
+
+export interface DisposableAccessPolicy {
+  /** Enables post-payment disposable-link delivery for this product. */
+  enabled: boolean;
+  /** Maximum successful file responses before the link is exhausted. */
+  max_downloads?: number;
+  /** Maximum successful view/open responses before the link is exhausted. */
+  max_views?: number;
+  /** Number of hours after issue time before the link expires. */
+  hours_valid?: number;
+  /** Optional cumulative byte ceiling across successful responses. */
+  max_total_bytes?: number;
+  /** Whether a buyer can receive a fresh link after another payment. */
+  allow_regeneration_after_payment?: boolean;
+  /** Direct paid download remains primary unless this is explicitly link-only. */
+  delivery?: DisposableAccessDeliveryMode;
+}
+
 /**
  * Where a product's sellable bytes actually live.
  *
@@ -52,6 +97,30 @@ export interface DesignSystemEntry {
   price_usd: string;
   /** Searchable tags for agent filtering */
   tags: string[];
+  /** License code for the paid asset or public preview material. */
+  license?: LicenseCode;
+  /** Public URL for the license terms. Should not require the paid asset. */
+  license_url?: string;
+  /** Short human/agent-readable rights summary for discovery. */
+  license_summary?: string;
+  /** Short inline preview. Keep partial enough that it is not the product. */
+  preview?: string;
+  /** Public preview, thumbnail, excerpt, or sample URL. Never the paid source URL. */
+  preview_url?: string;
+  /** Safe sample filenames or intentionally free sample assets. */
+  sample_files?: string[];
+  /** High-level sections for markdown/PDF-like products. */
+  table_of_contents?: string[];
+  /** Token categories included in the paid asset. */
+  token_categories?: string[];
+  /** Component names included in the paid asset. */
+  component_list?: string[];
+  /** SHA-256 of the paid payload when known and safe to publish. */
+  content_sha256?: string;
+  /** Safe public bundle listing. Do not include storage/source URLs. */
+  bundle_manifest?: BundleManifestEntry[];
+  /** Optional large-file fallback policy. Does not expose the underlying storage URL. */
+  disposable_access?: DisposableAccessPolicy;
   /** ISO 8601 creation timestamp */
   published_at: string;
   /** false = hidden from catalog but not deleted */
@@ -91,10 +160,26 @@ export interface CatalogResponse {
 }
 
 /** A single entry in the discovery catalog — file path intentionally omitted */
-export interface CatalogEntry extends Omit<DesignSystemEntry, 'file'> {
+export interface CatalogEntry extends Omit<DesignSystemEntry, 'file' | 'source'> {
   access_url: string;
   download_url?: string;
   payment_required: true;
+}
+
+export interface PaidAccessReceipt {
+  product_id: string;
+  resource_url: string;
+  amount_usd: string;
+  network: string;
+  asset?: string;
+  pay_to: string;
+  payer?: string;
+  transaction?: string;
+  payment_response?: unknown;
+  content_sha256?: string;
+  created_at: string;
+  delivered_via: 'direct' | 'disposable_link';
+  disposable_link_expires_at?: string;
 }
 
 // ─── Admin Types ──────────────────────────────────────────────────────────────

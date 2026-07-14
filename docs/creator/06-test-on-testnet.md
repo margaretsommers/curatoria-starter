@@ -112,6 +112,9 @@ The bug bash is the main local gate. Shared checks (both tracks):
 - Unpaid markdown route returns `402 Payment Required`
 - Unpaid bundle route returns `402 Payment Required`
 - Each asset `402` challenge includes Bazaar discovery metadata
+- Local demo fixture integrity passes from raw file bytes: markdown readability,
+  zip structure, byte sizes, and SHA-256 hashes. Starter exports also include
+  PNG, PDF, JSON, and font signature checks.
 
 **Track A (default) checks:**
 
@@ -138,7 +141,7 @@ You can still run the smaller smoke command when you only need the core service 
 npm run smoke
 ```
 
-Smoke checks health, teaser shape (Track B), unpaid `/catalog` 402 (Track B, skipped when bypass is on), and unpaid asset paywalls. Bug bash is preferred before testnet proof because it also exercises bundle routes and Bazaar metadata expectations.
+Smoke checks health, teaser shape (Track B), unpaid `/catalog` 402 (Track B, skipped when bypass is on), unpaid asset paywalls, and local fixture integrity. Bug bash is preferred before testnet proof because it also exercises bundle routes and Bazaar metadata expectations.
 
 ## 6. Check The Unpaid Asset Paywall Manually
 
@@ -191,6 +194,14 @@ AWAL_PAID_TEST=1 npm run bug-bash -- --local --paid
 ```
 
 On Track B, the paid bug-bash path pays for `/catalog` first, then for a demo asset. If authentication or balance is missing, the paid portion should skip and print the human next step instead of attempting payment. Keep buyer wallet signing material outside committed files.
+
+Important limitation: `awal x402 pay --json` is a settlement/debug proof, not a
+binary-safe local-save proof, unless it exposes a safe signer handoff. Do not
+save zips, images, PDFs, fonts, or other binary assets from CLI stdout or JSON
+string fields. A product-grade paid download test must use a browser/client path
+or the agent downloader signer adapter so each request gets a fresh x402 payment
+payload for the validated resource, then saves the paid response as raw bytes
+(`ArrayBuffer`, `Blob`, or stream) and verifies file type and hash.
 
 ## Stop/Go Checklist
 

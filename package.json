@@ -18,6 +18,7 @@
     "smoke": "npm run smoke --workspace @curatoria/service",
     "check-dns-aid": "npm run check-dns-aid --workspace @curatoria/service",
     "bug-bash": "npm run bug-bash --workspace @curatoria/service --",
+    "agent-download": "npm run agent-download --workspace @curatoria/service --",
     "publish-design": "npm run publish-design --workspace @curatoria/service --",
     "publish-pack": "npm run publish-pack --workspace @curatoria/service --"
   },

@@ -12,9 +12,32 @@
       "name": "Minimal SaaS Design System",
       "description": "A small example product you can replace with your own design resource.",
       "price_usd": "0.01",
-      "tags": ["starter", "example", "design-system"],
+      "tags": [
+        "starter",
+        "example",
+        "design-system"
+      ],
       "published_at": "2026-05-08T00:00:00Z",
-      "active": true
+      "active": true,
+      "license": "custom-commercial",
+      "license_summary": "Replace with the rights buyers receive after payment.",
+      "preview": "Small SaaS design-system sample with tokens and component notes. Full reusable file requires payment.",
+      "sample_files": [
+        "example-minimal.md"
+      ],
+      "table_of_contents": [
+        "Foundations",
+        "Components",
+        "Usage"
+      ],
+      "token_categories": [
+        "color",
+        "spacing"
+      ],
+      "component_list": [
+        "Button",
+        "Card"
+      ]
     },
     {
       "id": "curatoria-demo-md",
@@ -24,9 +47,21 @@
       "name": "Curatoria Demo Markdown",
       "description": "A generic paid markdown proof fixture for testing x402 catalog delivery.",
       "price_usd": "0.01",
-      "tags": ["starter", "demo", "markdown", "x402"],
+      "tags": [
+        "starter",
+        "demo",
+        "markdown",
+        "x402"
+      ],
       "published_at": "2026-06-17T00:00:00Z",
-      "active": true
+      "active": true,
+      "license": "custom-commercial",
+      "license_summary": "Demo commercial-use license text; replace before selling real work.",
+      "preview": "A short excerpt that proves markdown discovery without exposing the full paid file.",
+      "table_of_contents": [
+        "What this proves",
+        "How to replace it"
+      ]
     },
     {
       "id": "curatoria-demo-pack",
@@ -37,9 +72,45 @@
       "name": "Curatoria Demo Pack",
       "description": "A tiny paid zip proof fixture for testing x402 bundle delivery.",
       "price_usd": "0.03",
-      "tags": ["starter", "demo", "bundle", "x402"],
+      "tags": [
+        "starter",
+        "demo",
+        "bundle",
+        "x402"
+      ],
       "published_at": "2026-06-17T00:00:00Z",
-      "active": true
+      "active": true,
+      "license": "custom-commercial",
+      "license_summary": "Demo bundle rights; replace with your own paid license terms.",
+      "preview": "The paid bundle includes a README, tokens JSON, and nested usage notes.",
+      "sample_files": [
+        "README.md",
+        "tokens.json",
+        "nested/usage-notes.md"
+      ],
+      "bundle_manifest": [
+        {
+          "path": "README.md",
+          "kind": "documentation",
+          "mime_type": "text/markdown"
+        },
+        {
+          "path": "tokens.json",
+          "kind": "tokens",
+          "mime_type": "application/json"
+        },
+        {
+          "path": "nested/usage-notes.md",
+          "kind": "documentation",
+          "mime_type": "text/markdown"
+        }
+      ],
+      "disposable_access": {
+        "enabled": true,
+        "max_downloads": 1,
+        "hours_valid": 24,
+        "delivery": "fallback_when_direct_too_large"
+      }
     },
     {
       "id": "dropbox-example",
@@ -53,9 +124,16 @@
       "name": "Dropbox Example (replace before use)",
       "description": "Inactive example showing how a Dropbox Mode A share link is recorded in the registry.",
       "price_usd": "0.01",
-      "tags": ["starter", "dropbox", "example"],
+      "tags": [
+        "starter",
+        "dropbox",
+        "example"
+      ],
       "published_at": "2026-06-17T00:00:00Z",
-      "active": false
+      "active": false,
+      "license": "custom-commercial",
+      "license_summary": "Inactive example metadata only; replace before activation.",
+      "preview": "Shows source metadata shape without publishing the Dropbox file bytes."
     }
   ]
 }

@@ -69,6 +69,7 @@ import { handleMcpServerCard } from './mcp-server-card';
 import { handleAgentSkillFile, handleAgentSkillsIndex } from './agent-skills-index';
 import { createX402DiscoveryHandler } from './x402-discovery';
 import { PublishRequest, DesignSystemEntry } from './types';
+import { setPaidResourceHeaders } from './delivery';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -200,6 +201,14 @@ async function buildApp(): Promise<express.Express> {
         'PAYMENT-RESPONSE',
         'X-PAYMENT-REQUIRED',
         'X-PAYMENT-RESPONSE',
+        'Content-Disposition',
+        'Content-Length',
+        'Content-Type',
+        'X-Design-System-Id',
+        'X-Design-System-Name',
+        'X-Design-System-Version',
+        'X-Storage-Source',
+        'X-Content-Sha256',
       ],
     }),
   );
@@ -306,15 +315,11 @@ async function buildApp(): Promise<express.Express> {
         return;
       }
 
-      res
-        .setHeader('Cache-Control', 'private, no-store')
-        .setHeader('Pragma', 'no-cache')
-        .setHeader('Content-Type', `${resolved.mimeType}; charset=utf-8`)
-        .setHeader('X-Design-System-Id', entry.id)
-        .setHeader('X-Design-System-Name', entry.name)
-        .setHeader('X-Design-System-Version', '1.0.0')
-        .setHeader('X-Storage-Source', resolved.sourceType)
-        .send(resolved.buffer);
+      setPaidResourceHeaders(res, resolved, {
+        id: entry.id,
+        name: entry.name,
+        contentSha256: entry.content_sha256,
+      }).send(resolved.buffer);
     },
   );
 
@@ -342,16 +347,11 @@ async function buildApp(): Promise<express.Express> {
         return;
       }
 
-      res
-        .setHeader('Cache-Control', 'private, no-store')
-        .setHeader('Pragma', 'no-cache')
-        .setHeader('Content-Type', resolved.mimeType)
-        .setHeader('Content-Disposition', `attachment; filename="${resolved.filename}"`)
-        .setHeader('X-Design-System-Id', entry.id)
-        .setHeader('X-Design-System-Name', entry.name)
-        .setHeader('X-Design-System-Version', '1.0.0')
-        .setHeader('X-Storage-Source', resolved.sourceType)
-        .send(resolved.buffer);
+      setPaidResourceHeaders(res, resolved, {
+        id: entry.id,
+        name: entry.name,
+        contentSha256: entry.content_sha256,
+      }).send(resolved.buffer);
     },
   );
 
