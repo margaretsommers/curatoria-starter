@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response, NextFunction } from 'express';
-import { PUBLIC_DIR } from './paths';
+import { PUBLIC_DIR, resolvePublicPath } from './paths';
 
 export { PUBLIC_DIR };
 
@@ -180,7 +180,36 @@ export function convertHtmlFileToMarkdown(filePath: string): { markdown: string;
   return { markdown, tokens: estimateMarkdownTokens(markdown) };
 }
 
+/**
+ * Confirmed 2026-09-06 in production: public/ is not reliably present in
+ * Vercel's deployed function bundle (the same class of issue as
+ * design-systems/ before it -- see src/paths.ts). Files under public/ that
+ * Vercel's own static CDN serves directly for an exact-path match (proven by
+ * public/sitemap.xml continuing to 200 even when the function itself was
+ * completely down) never reach this code at all; the ones that do reach it
+ * are requests the function's own router claimed (like the bare "/" for the
+ * homepage) that don't have a literal static counterpart at that exact URL.
+ * Redirecting to the file's own static path lets Vercel's CDN serve it
+ * directly instead of a hard 404/500 -- a real client (browser or
+ * markdown-aware agent) follows the redirect and gets the real content,
+ * just without server-side markdown conversion on that specific hop.
+ */
 export function sendPublicHtml(req: Request, res: Response, filePath: string): void {
+  if (!fs.existsSync(filePath)) {
+    const relative = path.relative(PUBLIC_DIR, filePath).split(path.sep).join('/');
+    const staticPath = `/${relative}`;
+    // Only redirect when it actually goes somewhere new -- a request already
+    // made directly to that exact static path (e.g. /starter-guide.html)
+    // reaching this function at all means the CDN's own static match for it
+    // failed too, and redirecting to itself would loop forever.
+    if (req.path !== staticPath) {
+      res.redirect(302, staticPath);
+      return;
+    }
+    res.status(404).end();
+    return;
+  }
+
   if (wantsMarkdown(req)) {
     const { markdown, tokens } = convertHtmlFileToMarkdown(filePath);
     res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
@@ -213,7 +242,7 @@ export function resolvePublicHtmlPath(urlPath: string): string | null {
   const normalized = urlPath.split('?')[0] || '/';
   const relative = STATIC_HTML_ROUTES[normalized];
   if (!relative) return null;
-  return path.join(PUBLIC_DIR, relative);
+  return resolvePublicPath(relative);
 }
 
 export function negotiateMarkdownStatic(req: Request, res: Response, next: NextFunction): void {

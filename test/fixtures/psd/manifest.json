@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "file": "tiny-rgb-1x1.psd",
+  "bytes": 43,
+  "sha256": "13816c1d70cf697784904f76549cfdee4ebf4a7309878923933cd65fd2318025",
+  "format": {
+    "signature": "8BPS",
+    "version": 1,
+    "channels": 3,
+    "height": 1,
+    "width": 1,
+    "depth": 8,
+    "color_mode": "RGB",
+    "compression": "raw"
+  },
+  "generated_by": "scripts/generate-psd-fixture.ts",
+  "source": "generated; no external or copyrighted source material"
+}

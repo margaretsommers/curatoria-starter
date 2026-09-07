@@ -50,12 +50,13 @@ These routes are registered in `src/server.ts` when you deploy. No extra code re
 | Agent skills index | `GET /.well-known/agent-skills/index.json` | Skills served from `/.well-known/agent-skills/*/SKILL.md` |
 | MCP server card | `GET /.well-known/mcp/server-card.json` | Discovery card; `/mcp` handler not required for listing |
 | Sitemap | `GET /sitemap.xml` | Static pages + active catalog products |
-| Paid assets | `GET /design-systems/:id`, `GET /packs/:id/download` | HTTP **402** + `PAYMENT-REQUIRED` when unpaid |
+| Paid assets | `GET /design-systems/:id`, `GET /packs/:id/download`, `GET /assets/:id/purchase` | HTTP **402** + `PAYMENT-REQUIRED` when unpaid |
+| Binary redemption | `GET /assets/:id/redeem` | Entitlement bearer token returns a short-lived private Blob URL |
 | Health | `GET /health` | Network, wallet, storage status |
 
 **Markdown negotiation:** send `Accept: text/markdown` on HTML pages under `public/` to receive markdown with YAML frontmatter (homepage/docs if you add them).
 
-**Link headers:** if you serve a homepage from `public/index.html` through the service, add RFC 8288 `Link` headers pointing at `/.well-known/api-catalog` and `/.well-known/x402` (see operator `src/link-headers.ts` for the pattern).
+**Link headers:** if you serve a homepage from `public/index.html` through the service, add RFC 8288 `Link` headers pointing at `/.well-known/api-catalog` and `/.well-known/x402` (see `src/link-headers.ts` for the pattern).
 
 ---
 
@@ -66,10 +67,45 @@ MCP is useful packaging for agents later. It is not the P0 marketplace or paymen
 For Curatoria, the split is simple:
 
 - **Coinbase owns payment:** wallet authentication, funds, x402 challenge payment, and settlement.
-- **Curatoria owns buying logic:** catalog interpretation, product selection, save destination, file validation, and proof output.
+- **Curatoria owns buying logic:** catalog interpretation, product selection, entitlement redemption, save destination, file validation, and proof output.
 - **Creators own supply:** each starter deployment is one creator's catalog unless you deliberately build an aggregator.
 
-A future Curatoria MCP could expose tools like `search_catalog`, `buy_asset`, `verify_download`, and `explain_receipt`. Build that after the basic proof works: one agent reads one catalog, pays for one asset, saves the file locally, and reports proof.
+A Curatoria wallet bridge may expose `buy_asset` through Coinbase Payments MCP,
+but its output is entitlement JSON only. Curatoria's downloader owns the private
+URL fetch and local file save. Future MCP tools can add `search_catalog`,
+`verify_download`, and `explain_receipt` without moving binary bytes through MCP.
+
+### Buyer prompt contract
+
+A buyer prompt or skill is ready only when its control flow is explicit and
+testable:
+
+1. Ask for the local destination and resolve an existing-file collision before
+   any wallet call.
+2. Require the requested product to be active in the current catalog; an
+   example or stale product ID is not executable. Compare amount, chain, token
+   contract, payee, product ID, filename, and
+   purchase resource with catalog metadata and the 402 challenge.
+3. Keep the wallet's role to signing/payment. Curatoria's downloader receives
+   metadata-only entitlement JSON on stdin and exclusively owns redemption,
+   streaming, atomic saving, and local integrity checks.
+4. Resume an interrupted post-payment download from entitlement state without
+   paying again.
+5. Stop for a human decision when entitlement is expired or payment settlement
+   is inconclusive.
+6. Never expose file bytes, an entitlement bearer value, a signed private URL,
+   a payment signature, wallet secrets, or provider/admin credentials in chat,
+   logs, receipts, command arguments, or model prompts.
+
+For Coinbase Payments MCP, the only payment sequence is
+`check_payment_requirements` followed by exactly one
+`make_x402_request`. Pass its entitlement JSON directly to downloader
+`--entitlement-stdin` with a published product ID, explicit destination, and
+explicit collision policy. The JSON-only stdin channel is capped at 1 MiB and
+the continuation invokes no wallet or payment retry. Never route binary bytes
+through MCP. For MetaMask/browser purchases, do not
+claim completion until a local disk verifier finds the actual browser-selected
+filename and verifies hash, byte count, and file signature.
 
 ---
 
@@ -94,7 +130,7 @@ RFC 9309 crawl rules plus AI bot allowances. Include:
 - `Content-Signal: search=yes, ai-input=yes, ai-train=no` (per [Content Signals](https://contentsignals.org/))
 - `Sitemap: https://yourdomain.com/sitemap.xml`
 
-Regenerate or edit `public/sitemap.xml` when you publish products (`npm run publish-design` updates it in the operator workflow; after publish, confirm sitemap includes new product URLs).
+Regenerate or edit `public/sitemap.xml` when you publish products (`npm run publish-design` updates it; after publish, confirm sitemap includes new product URLs).
 
 ### 3. Optional: WebMCP (`public/webmcp.js`)
 
@@ -168,7 +204,7 @@ Admin publish routes still use `X-Admin-Key`. Do not expose that key in any publ
 
 ## DNS-AID (optional, advanced)
 
-DNS-based agent discovery (`_index._agents` HTTPS SVCB records) is optional and requires DNS provider support plus DNSSEC. The operator repo includes `docs/operator/dns-aid-records.md` and `npm run check-dns-aid` for Margaret's Hover setup; most creators can skip this until the spec is widely checked by scanners.
+DNS-based agent discovery (`_index._agents` HTTPS SVCB records) is optional and requires DNS provider support plus DNSSEC. Most creators can skip it until the specification is widely checked by scanners.
 
 ---
 
@@ -180,8 +216,14 @@ Use this before claiming “agent-ready” on your domain:
 - [ ] `npm run smoke` passes against production
 - [ ] `public/llms.txt` and `public/robots.txt` return 200
 - [ ] `GET /.well-known/x402` lists your paid resource URLs
-- [ ] Unpaid `GET /design-systems/<id>` returns **402** with `PAYMENT-REQUIRED`
+- [ ] Unpaid paid routes return **402** with `PAYMENT-REQUIRED`
+- [ ] Binary catalog entries expose hash, bytes, filename, and `/assets/<id>/purchase` without source or Blob paths
 - [ ] Mainnet: CDP facilitator env vars set and preflight OK
+- [ ] Buyer prompts ask for destination/collision choice before payment and stop on challenge drift
+- [ ] Buyer prompts stop when the requested product is absent from the current catalog
+- [ ] Noninteractive buyers pass an explicit collision policy; `--yes` never chooses one
+- [ ] Paid entitlement continuation uses JSON-only `--entitlement-stdin` and zero wallet calls
+- [ ] Buyer prompts resume entitlements without repayment and require local disk verification after browser saves
 - [ ] Sitemap includes catalog and product URLs
 - [ ] (Optional) WebMCP script on your homepage
 - [ ] (Optional) isitagentready scan — review `checks.discovery.*` and `checks.commerce.x402`

@@ -18,6 +18,16 @@ type AdapterInternals = {
     entry: CatalogEntry;
     config?: { allowedNetworks?: string[]; maxAmountAtomic?: string | number };
   }): PaymentAccept;
+  walletStates: string[];
+};
+
+type PaymentAdapter = {
+  pay(input: {
+    url: string;
+    challenge: { body: PaymentRequired };
+    entry: CatalogEntry;
+    onStateChange(state: { name: string }): void;
+  }): Promise<{ headers: Record<string, string> }>;
 };
 
 type PaymentAccept = {
@@ -76,6 +86,38 @@ function loadAdapterInternals(): AdapterInternals {
   return context.curatoriaX402PaymentAdapter?.__testing as AdapterInternals;
 }
 
+function loadAdapterWithEthereum(ethereum: unknown): PaymentAdapter {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../public/x402-payment-adapter.js'),
+    'utf8',
+  );
+  const context = {
+    Buffer,
+    TextDecoder,
+    TextEncoder,
+    URL,
+    Uint8Array,
+    atob: globalThis.atob,
+    btoa: globalThis.btoa,
+    crypto: {
+      getRandomValues(bytes: Uint8Array) {
+        bytes.fill(7);
+        return bytes;
+      },
+    },
+    location: { origin: 'https://curatoria.dev' },
+    ethereum,
+    confirm: () => true,
+  } as vm.Context & {
+    curatoriaX402PaymentAdapter?: PaymentAdapter;
+    globalThis?: unknown;
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  return context.curatoriaX402PaymentAdapter as PaymentAdapter;
+}
+
 function paymentRequired(overrides: Partial<PaymentAccept> = {}): PaymentRequired {
   const accept: PaymentAccept = {
     scheme: 'exact',
@@ -128,6 +170,43 @@ test('x402 browser adapter validates exact catalog payment requirements', () => 
 
   assert.equal(accepted.amount, '10000');
   assert.equal(adapter.usdToAtomicUsdc('12.345678'), '12345678');
+});
+
+test('x402 browser adapter validates binary purchase JSON separately from PSD MIME', () => {
+  const adapter = loadAdapterInternals();
+  const purchaseUrl = 'https://curatoria.dev/assets/layout/purchase';
+  const accepted = adapter.validatePaymentRequirement({
+    url: purchaseUrl,
+    paymentRequired: {
+      ...paymentRequired(),
+      resource: { url: purchaseUrl, mimeType: 'application/json; charset=utf-8' },
+    },
+    entry: catalogEntry({
+      id: 'layout',
+      access_url: purchaseUrl,
+      resource_type: 'binary_asset',
+      mime_type: 'image/vnd.adobe.photoshop',
+    }),
+  });
+
+  assert.equal(accepted.amount, '10000');
+  assert.throws(
+    () =>
+      adapter.validatePaymentRequirement({
+        url: purchaseUrl,
+        paymentRequired: {
+          ...paymentRequired(),
+          resource: { url: purchaseUrl, mimeType: 'image/vnd.adobe.photoshop' },
+        },
+        entry: catalogEntry({
+          id: 'layout',
+          access_url: purchaseUrl,
+          resource_type: 'binary_asset',
+          mime_type: 'image/vnd.adobe.photoshop',
+        }),
+      }),
+    /application\/json/,
+  );
 });
 
 test('x402 browser adapter rejects cross-origin asset URLs', () => {
@@ -241,4 +320,81 @@ test('x402 browser adapter encodes retry payload for PAYMENT-SIGNATURE', () => {
   assert.equal(decoded.x402Version, 2);
   assert.equal(decoded.accepted.payTo, PAY_TO);
   assert.equal(decoded.payload.authorization.value, '10000');
+});
+
+test('x402 browser adapter exposes explicit wallet states and invalidates changed auth', () => {
+  const adapter = loadAdapterInternals();
+  assert.deepEqual(
+    [...adapter.walletStates].sort(),
+    [
+      'disconnected',
+      'connecting',
+      'unlock',
+      'wrong-network',
+      'confirm',
+      'sign',
+      'paid',
+      'retryable',
+    ].sort(),
+  );
+  const source = fs.readFileSync(
+    path.join(__dirname, '../public/x402-payment-adapter.js'),
+    'utf8',
+  );
+  assert.match(source, /accountsChanged/);
+  assert.match(source, /chainChanged/);
+  assert.match(source, /Wallet account or chain changed/);
+  assert.match(source, /Filename:/);
+  assert.match(source, /Asset:/);
+});
+
+test('x402 browser adapter discards a signature when account changes while signing', async () => {
+  const listeners = new Map<string, () => void>();
+  let resolveSignature: ((value: string) => void) | undefined;
+  const ethereum = {
+    async request({ method }: { method: string }) {
+      if (method === 'eth_requestAccounts') {
+        return ['0x2222222222222222222222222222222222222222'];
+      }
+      if (method === 'wallet_switchEthereumChain') return null;
+      if (method === 'eth_signTypedData_v4') {
+        return new Promise<string>(resolve => {
+          resolveSignature = resolve;
+        });
+      }
+      throw new Error(`Unexpected method ${method}`);
+    },
+    on(event: string, listener: () => void) {
+      listeners.set(event, listener);
+    },
+    removeListener(event: string) {
+      listeners.delete(event);
+    },
+  };
+  const adapter = loadAdapterWithEthereum(ethereum);
+  const url = 'https://curatoria.dev/assets/layout/purchase';
+  const states: string[] = [];
+  const pending = adapter.pay({
+    url,
+    challenge: {
+      body: {
+        ...paymentRequired(),
+        resource: { url, mimeType: 'application/json' },
+      },
+    },
+    entry: catalogEntry({
+      id: 'layout',
+      access_url: url,
+      resource_type: 'binary_asset',
+      mime_type: 'image/vnd.adobe.photoshop',
+    }),
+    onStateChange: state => states.push(state.name),
+  });
+  while (!resolveSignature) await new Promise(resolve => setImmediate(resolve));
+  listeners.get('accountsChanged')?.();
+  resolveSignature(`0x${'ab'.repeat(65)}`);
+
+  await assert.rejects(pending, /wallet changed/i);
+  assert.equal(states.includes('retryable'), true);
+  assert.equal(listeners.size, 0);
 });

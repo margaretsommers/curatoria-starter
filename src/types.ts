@@ -1,6 +1,8 @@
 // ─── Registry Types ───────────────────────────────────────────────────────────
 
-export type ResourceType = 'design_md' | 'bundle_zip';
+export type ResourceType = 'design_md' | 'bundle_zip' | 'binary_asset';
+export type IntegrityStatus = 'verified' | 'unverified';
+export type DeliveryMode = 'direct' | 'entitlement';
 
 export type LicenseCode =
   | 'proprietary'
@@ -117,6 +119,16 @@ export interface DesignSystemEntry {
   component_list?: string[];
   /** SHA-256 of the paid payload when known and safe to publish. */
   content_sha256?: string;
+  /** Exact immutable payload size recorded during import. */
+  content_bytes?: number;
+  /** Whether import verified the immutable payload hash and byte count. */
+  integrity_status?: IntegrityStatus;
+  /** Binary assets use entitlement delivery; legacy small products may remain direct. */
+  delivery_mode?: DeliveryMode;
+  /** Original provider category, without exposing the source URL or provider object id. */
+  source_provider?: StorageSourceType;
+  /** Private immutable object path. Never expose this field through discovery. */
+  blob_path?: string;
   /** Safe public bundle listing. Do not include storage/source URLs. */
   bundle_manifest?: BundleManifestEntry[];
   /** Optional large-file fallback policy. Does not expose the underlying storage URL. */
@@ -160,9 +172,11 @@ export interface CatalogResponse {
 }
 
 /** A single entry in the discovery catalog — file path intentionally omitted */
-export interface CatalogEntry extends Omit<DesignSystemEntry, 'file' | 'source'> {
+export interface CatalogEntry extends Omit<DesignSystemEntry, 'file' | 'source' | 'blob_path'> {
   access_url: string;
   download_url?: string;
+  /** Safe output filename for paid binary delivery; never a source path. */
+  download_filename?: string;
   payment_required: true;
 }
 

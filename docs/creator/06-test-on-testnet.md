@@ -111,6 +111,8 @@ The bug bash is the main local gate. Shared checks (both tracks):
 - `/health` is reachable and configured
 - Unpaid markdown route returns `402 Payment Required`
 - Unpaid bundle route returns `402 Payment Required`
+- Unpaid binary purchase route (`GET /assets/:id/purchase`) returns `402` when
+  a `binary_asset` product is in the catalog
 - Each asset `402` challenge includes Bazaar discovery metadata
 - Local demo fixture integrity passes from raw file bytes: markdown readability,
   zip structure, byte sizes, and SHA-256 hashes. Starter exports also include
@@ -157,7 +159,21 @@ For a bundle product:
 curl -v http://localhost:3000/packs/curatoria-demo-pack/download
 ```
 
-Expected for both: `HTTP/1.1 402 Payment Required` and payment challenge headers. If you replaced the demo IDs, use your product IDs instead.
+For a published binary product (`resource_type: binary_asset`):
+
+```bash
+curl -v http://localhost:3000/assets/YOUR-BINARY-ID/purchase
+```
+
+Expected for markdown, zip, and binary purchase: `HTTP/1.1 402 Payment Required`
+and payment challenge headers. Binary purchase is a JSON entitlement route, not
+a file download. The starter demo catalog ships markdown and zip only; publish a
+binary with `npm run publish-asset` before this check. If you replaced the demo
+IDs, use your product IDs instead.
+
+A wallet signs payment. It is not a file store. After a paid binary purchase
+the client receives entitlement JSON, redeems it with Curatoria, and saves raw
+bytes locally. Do not look in the wallet for the PSD or other binary.
 
 ## 7. Optional Paid Proof
 
@@ -173,7 +189,8 @@ The client must:
 2. Confirm challenge `payTo` matches your payout wallet
 3. Retry `GET /catalog` with `X-PAYMENT` → receive full `design_systems[]`
 4. Request a product `access_url` → read asset `402` challenge
-5. Retry with `X-PAYMENT` → receive markdown or zip bytes
+5. Retry with `X-PAYMENT` → receive markdown or zip bytes, or binary
+   entitlement JSON for `binary_asset` (then redeem and save raw bytes locally)
 
 ### Track A paid flow
 
@@ -182,7 +199,8 @@ The client must:
 1. Read free catalog (well-known or free `/catalog`)
 2. Request a product `access_url` → read asset `402` challenge
 3. Confirm challenge `payTo` matches your payout wallet
-4. Retry with `X-PAYMENT` → receive paid content
+4. Retry with `X-PAYMENT` → receive paid markdown/zip bytes, or binary
+   entitlement JSON for `binary_asset` (wallet is not the download destination)
 
 ### Awal opt-in
 
@@ -212,6 +230,7 @@ Go forward only when:
 - **Track B:** teaser shape is correct; unpaid `/catalog` returns `402`
 - **Track A:** well-known (or free `/catalog`) returns full `design_systems[]`
 - Unpaid markdown and bundle routes return `402`
+- If a `binary_asset` is published, unpaid `GET /assets/:id/purchase` returns `402`
 - Asset `402` challenges include Bazaar metadata
 - Optional paid proof is either green or explicitly deferred until the buyer wallet is funded/authenticated
 

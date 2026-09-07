@@ -35,16 +35,9 @@
  */
 
 import fs from 'fs';
-import path from 'path';
-import { resolveLocalDesignSystemsFile } from '../src/paths';
-
-// Resolve src modules relative to this script (handles both ts-node and compiled)
-const catalogPath = path.join(__dirname, '../src/catalog');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { appendEntry } = require(catalogPath) as typeof import('../src/catalog');
-const sourcesPath = path.join(__dirname, '../src/sources');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { buildSource } = require(sourcesPath) as typeof import('../src/sources');
+import { appendEntry } from '../src/catalog';
+import { resolveDesignSystemInputPath } from '../src/paths';
+import { buildSource } from '../src/sources';
 
 // ─── Arg parser ───────────────────────────────────────────────────────────────
 
@@ -88,10 +81,14 @@ if (isNaN(priceNum) || priceNum <= 0) {
 // ─── Resolve storage source (local file, remote URL, or Google Drive) ─────────
 
 let built: { file: string; source?: import('../src/types').EntrySource };
+let localFilePath: string | undefined;
 try {
+  localFilePath = args.file
+    ? resolveDesignSystemInputPath(args.file)
+    : undefined;
   built = buildSource({
     id: args.id,
-    file: args.file,
+    file: localFilePath,
     url: args.url,
     gdriveId: args['gdrive-id'],
     dropboxUrl: args['dropbox-url'],
@@ -105,17 +102,9 @@ try {
 
 // For local files, confirm the file is actually on disk before registering.
 if (!built.source && args.file) {
-  let filePath: string;
-  try {
-    filePath = resolveLocalDesignSystemsFile(args.file);
-  } catch (err) {
-    console.error(`\n${String(err instanceof Error ? err.message : err)}\n`);
-    process.exit(1);
-  }
-  if (!fs.existsSync(filePath)) {
-    console.error(`\nFile not found: ${filePath}`);
-    console.error('Place the file under design-systems/ first, then publish with:');
-    console.error('  --file design-systems/your-product.md\n');
+  if (!localFilePath || !fs.existsSync(localFilePath)) {
+    console.error(`\nFile not found: ${args.file}`);
+    console.error('Make sure the .md file exists in the design-systems/ directory first.\n');
     process.exit(1);
   }
 }
@@ -134,21 +123,26 @@ const entry = {
   active: true,
 };
 
-appendEntry(entry);
-
-console.log('');
-console.log(`  ✓ Published "${entry.name}"`);
-console.log(`    ID:     ${entry.id}`);
-console.log(
-  `    Source: ${
-    entry.source
-      ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id ?? entry.source.share_url ?? entry.source.dropbox_path})`
-      : `local (${entry.file})`
-  }`,
-);
-console.log(`    Price:  $${entry.price_usd} USDC per access`);
-if (entry.tags.length) console.log(`    Tags:  ${entry.tags.join(', ')}`);
-console.log('');
-console.log(`  Access URL (once server is running):`);
-console.log(`    http://localhost:3000/design-systems/${entry.id}`);
-console.log('');
+appendEntry(entry)
+  .then(() => {
+    console.log('');
+    console.log(`  ✓ Published "${entry.name}"`);
+    console.log(`    ID:     ${entry.id}`);
+    console.log(
+      `    Source: ${
+        entry.source
+          ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id ?? entry.source.share_url ?? entry.source.dropbox_path})`
+          : `local (${entry.file})`
+      }`,
+    );
+    console.log(`    Price:  $${entry.price_usd} USDC per access`);
+    if (entry.tags.length) console.log(`    Tags:  ${entry.tags.join(', ')}`);
+    console.log('');
+    console.log(`  Access URL (once server is running):`);
+    console.log(`    http://localhost:3000/design-systems/${entry.id}`);
+    console.log('');
+  })
+  .catch(error => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });

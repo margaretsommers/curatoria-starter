@@ -8,12 +8,15 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 import { isPaymentRequiredV2, validatePaymentRequired } from '@x402/core/schemas';
+import { createObservabilityEvent } from '../src/observability';
+import { assertPreviewAllowed, PREVIEW_WALLET } from '../src/paid-psd-harness';
 
 export type CheckResult = { name: string; ok: boolean; detail: string };
 
 export type SmokeCheckOptions = {
   markdownId?: string;
   bundleId?: string;
+  binaryAssetId?: string;
 };
 
 export type PaidCheckTarget = {
@@ -24,7 +27,6 @@ export type PaidCheckTarget = {
 
 const DEFAULT_MARKDOWN_ID = 'curatoria-demo-md';
 const DEFAULT_BUNDLE_ID = 'curatoria-demo-pack';
-const AWAL_PACKAGE = 'awal@2.10.0';
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DESIGN_SYSTEMS_DIR = path.join(ROOT_DIR, 'design-systems');
 
@@ -314,6 +316,46 @@ export async function checkUnpaidBundle402(
   };
 }
 
+export async function checkUnpaidBinaryAsset402(
+  baseUrl: string,
+  binaryAssetId?: string,
+): Promise<CheckResult> {
+  let productId = binaryAssetId;
+  if (!productId) {
+    const res = await fetch(`${baseUrl}/.well-known/design-catalog.json`);
+    if (!res.ok) {
+      return {
+        name: 'unpaid binary asset challenge',
+        ok: false,
+        detail: `expected 200 from catalog, got ${res.status}`,
+      };
+    }
+    const body = (await res.json()) as {
+      design_systems?: Array<{ id?: string; resource_type?: string }>;
+    };
+    const found = (body.design_systems ?? []).find(
+      entry => entry.resource_type === 'binary_asset' && entry.id,
+    );
+    if (!found?.id) {
+      return {
+        name: 'unpaid binary asset challenge',
+        ok: true,
+        detail: 'SKIP (no binary_asset product published in this catalog yet)',
+      };
+    }
+    productId = found.id;
+  }
+
+  const challenge = await readPaymentChallenge(`${baseUrl}/assets/${productId}/purchase`);
+  return {
+    name: 'unpaid binary asset challenge',
+    ok: challenge.ok && challenge.hasBazaarExtension === true,
+    detail: challenge.ok
+      ? `status 402 with payment challenge for "${productId}"${challenge.hasBazaarExtension ? ' + Bazaar metadata' : ', missing Bazaar metadata'}`
+      : challenge.detail,
+  };
+}
+
 export async function checkHumanPages(baseUrl: string): Promise<CheckResult[]> {
   const pages = [
     { name: 'home page', path: '/' },
@@ -368,6 +410,45 @@ export async function checkLocalFixtureIntegrity(): Promise<CheckResult> {
   };
 }
 
+export function checkPaidPsdPreviewReadiness(): CheckResult {
+  try {
+    assertPreviewAllowed({
+      production: true,
+      publicOrigin: 'http://127.0.0.1',
+      walletAddress: PREVIEW_WALLET,
+      env: {},
+    });
+    return {
+      name: 'paid PSD preview readiness',
+      ok: false,
+      detail: 'preview harness accepted production',
+    };
+  } catch {
+    try {
+      createObservabilityEvent({
+        correlation_id: 'corr_dddddddddddddddddddddddddddddddd',
+        receipt_id: `rcpt_${'r'.repeat(43)}`,
+        stage: 'preview',
+        duration_ms: 0,
+        bytes: 43,
+        provider: 'local',
+        outcome: 'ok',
+      });
+    } catch (error) {
+      return {
+        name: 'paid PSD preview readiness',
+        ok: false,
+        detail: `observability event rejected: ${error instanceof Error ? error.message : 'unknown'}`,
+      };
+    }
+    return {
+      name: 'paid PSD preview readiness',
+      ok: true,
+      detail: 'preview refuses production; observability allowlist is intact; no spend',
+    };
+  }
+}
+
 export async function runSmokeChecks(
   baseUrl: string,
   options: SmokeCheckOptions = {},
@@ -380,7 +461,9 @@ export async function runSmokeChecks(
     await checkCatalogPerFetch402(baseUrl),
     await checkUnpaidMarkdown402(baseUrl, options.markdownId),
     await checkUnpaidBundle402(baseUrl, options.bundleId),
+    await checkUnpaidBinaryAsset402(baseUrl, options.binaryAssetId),
     await checkLocalFixtureIntegrity(),
+    checkPaidPsdPreviewReadiness(),
   ];
 }
 
@@ -475,7 +558,20 @@ export async function runPaidChecks(baseUrl: string): Promise<CheckResult[]> {
     ];
   }
 
-  const status = runAwal(['status']);
+  const awalExecutable = (process.env.AWAL_EXECUTABLE ?? '').trim();
+  if (!path.isAbsolute(awalExecutable) || awalExecutable.includes('\0')) {
+    return [
+      ...challengeChecks,
+      {
+        name: 'paid x402 proof',
+        ok: false,
+        detail:
+          'AWAL_PAID_TEST=1 requires AWAL_EXECUTABLE to be an absolute path to a reviewed, preinstalled awal binary',
+      },
+    ];
+  }
+
+  const status = runAwal(awalExecutable, ['status']);
   if (status.status !== 0) {
     return [
       ...challengeChecks,
@@ -483,12 +579,12 @@ export async function runPaidChecks(baseUrl: string): Promise<CheckResult[]> {
         name: 'paid x402 proof',
         ok: true,
         detail:
-          'SKIP paid (MCP buyer not authenticated). Human next: npx awal@2.10.0 auth login <email>',
+          `SKIP paid (MCP buyer not authenticated). Human next: ${awalExecutable} auth login <email>`,
       },
     ];
   }
 
-  const balance = runAwal(['balance', '--chain', ownerWallet.network]);
+  const balance = runAwal(awalExecutable, ['balance', '--chain', ownerWallet.network]);
   if (balance.status !== 0 || !hasSufficientBalance(balance.output, totalMaxAmount)) {
     return [
       ...challengeChecks,
@@ -503,7 +599,7 @@ export async function runPaidChecks(baseUrl: string): Promise<CheckResult[]> {
   const paidResults: CheckResult[] = [];
 
   if (catalogIsPaid) {
-    const catalogPayResult = runAwal([
+    const catalogPayResult = runAwal(awalExecutable, [
       'x402',
       'pay',
       catalogUrl,
@@ -529,7 +625,7 @@ export async function runPaidChecks(baseUrl: string): Promise<CheckResult[]> {
   }
 
   const assetPaidResults = targets.map((target) => {
-    const result = runAwal([
+    const result = runAwal(awalExecutable, [
       'x402',
       'pay',
       target.url,
@@ -661,8 +757,8 @@ function hasBazaarExtension(extensions?: Record<string, unknown> | null): boolea
   return Object.keys(extensions).some((key) => key.toLowerCase().includes('bazaar'));
 }
 
-function runAwal(args: string[]): { status: number; output: string } {
-  const result = spawnSync('npx', [AWAL_PACKAGE, ...args], {
+function runAwal(executable: string, args: string[]): { status: number; output: string } {
+  const result = spawnSync(executable, args, {
     stdio: 'pipe',
     encoding: 'utf8',
     timeout: 60_000,

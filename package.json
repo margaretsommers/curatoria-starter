@@ -15,20 +15,35 @@
     "dev": "npm run dev --workspace @curatoria/service",
     "start": "npm run start --workspace @curatoria/service",
     "build": "npm run build --workspace @curatoria/service",
+    "test": "node --require ts-node/register --test src/*.test.ts",
+    "test:local-integration": "node --require ts-node/register --test src/asset-delivery.test.ts src/blob-mode.test.ts src/blob-storage.test.ts src/browser-download.test.ts src/delivery.test.ts src/destination-preflight.test.ts src/download-receipt.test.ts src/local-blob-storage.test.ts src/local-delivery.test.ts src/observability.test.ts src/paid-psd-harness.test.ts src/resumable-download.test.ts",
+    "test:no-spend": "node --require ts-node/register --test src/no-spend-network.test.ts && CURATORIA_NETWORK_PRELOAD=1 node --require ts-node/register --require ./src/no-spend-network.test.ts --test src/asset-delivery.test.ts src/content-integrity.test.ts src/delivery.test.ts src/entitlements.test.ts src/observability.test.ts src/paid-access.test.ts src/rollback-packet.test.ts",
+    "test:preview": "node --require ts-node/register --test src/observability.test.ts src/paid-psd-harness.test.ts src/rollback-packet.test.ts",
+    "preview:paid-psd": "node --require ts-node/register scripts/preview-paid-psd.ts",
+    "drills:paid-psd": "node --require ts-node/register scripts/failure-drills.ts",
+    "rollback:prepare": "node --require ts-node/register scripts/prepare-rollback-packet.ts",
+    "test:boundary": "node --require ts-node/register --test src/starter-boundary.test.ts",
+    "test:proof": "node --require ts-node/register --test src/psd-fixture.test.ts src/proof-report.test.ts src/review-manifest.test.ts",
+    "check:starter-boundary": "ts-node scripts/check-starter-boundary.ts",
     "smoke": "npm run smoke --workspace @curatoria/service",
     "check-dns-aid": "npm run check-dns-aid --workspace @curatoria/service",
     "bug-bash": "npm run bug-bash --workspace @curatoria/service --",
     "agent-download": "npm run agent-download --workspace @curatoria/service --",
+    "publish-asset": "npm run publish-asset --workspace @curatoria/service --",
+    "migrate-registry-to-blob": "npm run migrate-registry-to-blob --workspace @curatoria/service",
     "publish-design": "npm run publish-design --workspace @curatoria/service --",
     "publish-pack": "npm run publish-pack --workspace @curatoria/service --"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "overrides": {
     "axios": "1.18.0",
+    "body-parser": "1.20.6",
+    "brace-expansion": "1.1.18",
+    "fast-uri": "3.1.6",
     "form-data": "4.0.6",
-    "qs": "6.15.2",
+    "qs": "6.16.0",
     "ws": "8.21.0"
   },
   "dependencies": {

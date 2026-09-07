@@ -5,10 +5,11 @@
 
 Curatoria sells products that live under `design-systems/` and are listed in `design-systems/.registry.json`. How agents discover that listing depends on your track — see [`01-before-you-start.md`](01-before-you-start.md). **Track A (default)** exposes the full listing for free at well-known; only asset delivery is paid. **Track B (optional)** uses a free teaser at well-known and paid full metadata at `GET /catalog`.
 
-You can publish two product types today:
+You can publish three product types:
 
 - Markdown products, served from `GET /design-systems/:id`.
 - Zip bundle products, served from `GET /packs/:id/download`.
+- Generic binary assets such as PSDs, purchased at `GET /assets/:id/purchase` and delivered through a short-lived entitlement.
 
 ## Product Checklist
 
@@ -94,6 +95,75 @@ Your paid download URL will be:
 http://localhost:3000/packs/starter-bundle/download
 ```
 
+## Import A Binary Asset
+
+Binary products are copied from the provider into private immutable Blob storage
+before publication. The registry keeps the original filename, MIME type, byte
+count, SHA-256, provider category, and private Blob pathname; public discovery
+omits provider IDs, provider URLs, and Blob paths.
+
+```bash
+export STARTER_PSD_SOURCE='https://drive.google.com/file/d/your-file-id/view'
+
+npm run publish-asset -- \
+  --id starter-psd \
+  --provider gdrive \
+  --source-env STARTER_PSD_SOURCE \
+  --original-file /absolute/path/to/starter.psd \
+  --filename starter.psd \
+  --mime image/vnd.adobe.photoshop \
+  --name "Starter PSD" \
+  --price 0.01 \
+  --tags psd,starter
+```
+
+For Dropbox, put the share link in a named environment variable and use
+`--provider dropbox --source-env YOUR_VARIABLE_NAME`. For another HTTPS source,
+use `--provider url`. Provider links and IDs are rejected in command-line
+arguments so they do not enter shell history or process listings.
+
+`--original-file` must be an absolute path to the local original. Curatoria
+compares the provider bytes with that original before upload. PSD import fails
+before publication unless both copies begin with `8BPS` and their SHA-256
+hashes match.
+
+Storage needs no setup for local development: without Vercel Blob credentials,
+import and paid delivery use a local filesystem store in `.local-blob/` — no
+Vercel account required. For deployments, configure private Vercel Blob with
+OIDC, or set `BLOB_READ_WRITE_TOKEN` to use Vercel Blob from a local import.
+Production always requires Vercel Blob; the local store is development-only.
+
+Before Blob, catalog, or a provider fetch, hash and validate the local PSD:
+
+```bash
+npm run publish-asset -- \
+  --preflight \
+  --filename starter.psd \
+  --mime image/vnd.adobe.photoshop \
+  --original-file /absolute/path/to/starter.psd
+```
+
+`--preflight` prints bytes, SHA-256, the `8BPS` signature, and filename/MIME
+safety. It exits `1` if the file is empty, missing the PSD signature, or has an
+unsafe name or MIME type. It does not write the catalog, call Blob, or fetch
+Drive or Dropbox.
+
+## Verified Versus Unverified Products
+
+`integrity_status` is public catalog metadata. It is not a private operator
+flag.
+
+- **`verified`:** Curatoria compared the provider bytes with a local original
+  and recorded SHA-256 plus byte count before publication. Curatoria demo and
+  proof products are always `verified`. Buyers should treat the published hash
+  as the success condition for a local save.
+- **`unverified`:** the creator opted out of a trusted hash commitment. The
+  catalog still must not expose source URLs or Blob paths. Buyers should not
+  treat a missing or unverified hash as a Curatoria integrity promise.
+
+Leaving `integrity_status` unset is not a verified product. Do not advertise
+byte-identical delivery unless the published entry is `verified`.
+
 ## Pricing Guidelines
 
 ### Asset prices (both tracks)
@@ -157,7 +227,11 @@ MIT and Apache-2.0 are software licenses. Use them for code assets when appropri
 
 ## Large Files And Disposable Access
 
-Direct paid download remains the primary path. For `.psd` files and other large binaries, Curatoria should treat payloads as opaque bytes: preserve the filename and MIME type, stream/save raw bytes, and verify byte count plus SHA-256 when available. Do not parse, flatten, preview, transcode, or reconstruct large binaries from terminal output.
+Direct paid download remains the legacy path for markdown and zip products. For
+`.psd` files and other large binaries, Curatoria treats payloads as opaque
+bytes: preserve the filename and MIME type, stream/save raw bytes, and require
+byte count plus SHA-256. Do not parse, flatten, preview, transcode, or reconstruct
+large binaries from terminal output.
 
 Disposable paid links are designed as a fallback for files that exceed direct download limits or time out. The schema can describe a creator's intended limits:
 
@@ -175,7 +249,11 @@ Disposable paid links are designed as a fallback for files that exceed direct do
 }
 ```
 
-This pass defines the metadata and server-side limit logic, but it does not ship a public disposable-link route. A production route still needs payment-bound link issuance, unguessable tokens, persisted counters, expiry enforcement, and byte-safe proxying that never exposes the original Drive, Dropbox, or source URL.
+Binary delivery uses a one-hour signed entitlement. Paying returns JSON, not the
+file. The buyer redeems the entitlement with Curatoria for an object-scoped
+private Blob URL, then streams the file to a temp path, verifies it, and commits
+without replacing an existing destination. Wallets never receive or store the
+file bytes.
 
 ### Catalog access price (Track B only)
 
@@ -203,6 +281,6 @@ You can edit `design-systems/.registry.json` directly when needed. Each active p
 }
 ```
 
-For bundles, use `resource_type: "bundle_zip"`, `mime_type: "application/zip"`, and `bundle_file`.
+For bundles, use `resource_type: "bundle_zip"`, `mime_type: "application/zip"`, and `bundle_file`. Use `npm run publish-asset` rather than hand-editing private Blob metadata for `binary_asset` products.
 
 Set `active` to `false` to hide a product from discovery without deleting its metadata.

@@ -7,9 +7,9 @@ This repository is a public starter template for creators who want to sell origi
 - `src/` for paywall service behavior
 - `scripts/` for publish and smoke-test tooling
 - `design-systems/` for example or creator-owned products
-- `public/` for the minimal service landing page and static agent-skill files
+- `public/` for the docs redirect and static creator docs only
 - `docs/` for public creator documentation
-- `apps/curatoria-service/` for the npm workspace wrapper
+- `apps/` for workspace package wrappers
 
 ## Do Not Add
 

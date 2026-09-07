@@ -3,6 +3,8 @@ dist/
 .env
 .env.*
 !.env.example
+.local-blob/
+.proof/
+tmp/
 .DS_Store
 npm-debug.log*
-public/sitemap.xml

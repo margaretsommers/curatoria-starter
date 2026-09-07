@@ -15,10 +15,17 @@ import {
 } from '@x402/core/server';
 import type { FacilitatorConfig } from '@x402/core/server';
 import type { Network } from '@x402/core/types';
-import { paymentMiddlewareFromHTTPServer } from '@x402/express';
+import { ExpressAdapter, paymentMiddlewareFromHTTPServer } from '@x402/express';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
 import { findEntry, resolveCatalogPriceUsd } from './catalog';
+import {
+  authorizedPaymentIdentity,
+  finalizedSettlementIdentity,
+  settlementReference,
+} from './asset-delivery';
+import type { EntitlementStore } from './entitlements';
+import type { SettlementJournal } from './settlement-journal';
 import { DesignSystemEntry, ResourceType } from './types';
 
 /** Track B: paid GET /catalog with free teaser at well-known. Default is Track A (free full catalog). */
@@ -74,6 +81,12 @@ const PROTECTED_RESOURCES: Record<ResourceType, ProtectedResource> = {
     mimeType: 'application/zip',
     resourceType: 'bundle_zip',
   },
+  binary_asset: {
+    routePattern: 'GET /assets/:id/purchase',
+    description: 'Curatoria paid binary asset entitlement',
+    mimeType: 'application/json',
+    resourceType: 'binary_asset',
+  },
 };
 
 export interface X402Config {
@@ -86,6 +99,13 @@ export interface X402Config {
 export type X402CatalogConfig = X402Config & {
   catalogPriceUsd?: string;
 };
+
+type SettlementFirstServer = Pick<
+  x402HTTPResourceServer,
+  'initialize' | 'processHTTPRequest' | 'processSettlement'
+>;
+
+export const X402_SETTLEMENT_LOCAL = 'x402Settlement';
 
 export type FacilitatorPreflightResult = {
   ok: boolean;
@@ -154,14 +174,24 @@ export function x402Paywall(config: X402Config) {
             required: ['id'],
           },
           output: {
-            example: expectedResourceType === 'bundle_zip'
-              ? '<zip binary bytes>'
-              : '# paid design markdown\n',
+            example:
+              expectedResourceType === 'binary_asset'
+                ? {
+                    entitlement: '<short-lived-signed-token>',
+                    redeem_url: '/assets/<id>/redeem',
+                    expires_at: '<ISO-8601>',
+                  }
+                : expectedResourceType === 'bundle_zip'
+                  ? '<zip binary bytes>'
+                  : '# paid design markdown\n',
             schema: {
-              type: 'string',
-              description: expectedResourceType === 'bundle_zip'
-                ? 'Zip binary content returned after successful x402 settlement.'
-                : 'Markdown content returned after successful x402 settlement.',
+              type: expectedResourceType === 'binary_asset' ? 'object' : 'string',
+              description:
+                expectedResourceType === 'binary_asset'
+                  ? 'Short-lived entitlement returned after successful x402 settlement.'
+                  : expectedResourceType === 'bundle_zip'
+                    ? 'Zip binary content returned after successful x402 settlement.'
+                    : 'Markdown content returned after successful x402 settlement.',
             },
           },
         }),
@@ -186,6 +216,175 @@ export function x402Paywall(config: X402Config) {
 
     invokeX402Middleware(officialMiddleware, req, res, next);
   };
+}
+
+/**
+ * Binary entitlement purchases must see authenticated finalized evidence before
+ * issuing claims. Official `paymentMiddlewareFromHTTPServer` buffers the route
+ * handler and calls `processSettlement` only after `res.end`, so a JSON
+ * entitlement would exist before facilitator finality. `onAfterSettle` cannot
+ * close that gap: resource-server hook errors are swallowed. This purchase
+ * middleware therefore verifies and settles first, then exposes only the
+ * authenticated facilitator identity in `res.locals`.
+ *
+ * Installed `HTTPFacilitatorClient` still has no settlement-status lookup. The
+ * crash window between `processSettlement` and `EntitlementStore.saveIfAbsent`
+ * is closed by persisting a durable settlement receipt immediately after
+ * facilitator finality, then skipping a second settle on retry. Direct byte
+ * routes continue using the official buffered flow.
+ */
+export function x402PurchasePaywall(
+  config: X402Config & {
+    settlementServer?: SettlementFirstServer;
+    settlementJournal?: SettlementJournal;
+    entitlementStore?: EntitlementStore;
+  },
+) {
+  const httpServer =
+    config.settlementServer ??
+    buildHttpResourceServer(config, PROTECTED_RESOURCES.binary_asset);
+  const middleware = createSettlementFirstMiddleware(httpServer, {
+    initialize: !config.settlementServer,
+    journal: config.settlementJournal,
+    entitlements: config.entitlementStore,
+  });
+  return function purchasePaywall(req: Request, res: Response, next: NextFunction): void {
+    if (!catalogEntryForRequest(req, 'binary_asset')) {
+      res.status(404).json({ error: `Resource "${req.params.id}" not found` });
+      return;
+    }
+    void middleware(req, res, next);
+  };
+}
+
+export type SettlementFirstOptions = {
+  initialize?: boolean;
+  journal?: SettlementJournal;
+  entitlements?: EntitlementStore;
+};
+
+export function createSettlementFirstMiddleware(
+  httpServer: SettlementFirstServer,
+  options: SettlementFirstOptions = {},
+) {
+  const initialize = options.initialize ?? false;
+  let initialization: Promise<void> | undefined;
+  return async function settlementFirst(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    aliasXPaymentHeader(req);
+    const adapter = new ExpressAdapter(req);
+    const context = {
+      adapter,
+      path: req.path,
+      method: req.method,
+      paymentHeader: adapter.getHeader('payment-signature') || adapter.getHeader('x-payment'),
+    };
+    try {
+      if (initialize) {
+        initialization ??= httpServer.initialize();
+        await initialization;
+      }
+      const signature = context.paymentHeader;
+      if (signature) {
+        let authorized: { network: string; payer: string } | undefined;
+        try {
+          authorized = authorizedPaymentIdentity(signature);
+        } catch {
+          authorized = undefined;
+        }
+        if (authorized) {
+          const recovered = await recoverSettledEvidence(
+            options,
+            settlementReference(signature),
+            idFromPath(req.path, 'binary_asset'),
+            authorized,
+          );
+          if (recovered) {
+            res.locals[X402_SETTLEMENT_LOCAL] = recovered;
+            next();
+            return;
+          }
+        }
+      }
+      const result = await httpServer.processHTTPRequest(context);
+      if (result.type === 'no-payment-required') {
+        next();
+        return;
+      }
+      if (result.type === 'payment-error') {
+        sendInstructions(res, result.response);
+        return;
+      }
+      const verifiedSignature = context.paymentHeader ?? '';
+      const authorized = authorizedPaymentIdentity(verifiedSignature);
+      const reference = settlementReference(verifiedSignature);
+      const settled = await httpServer.processSettlement(
+        result.paymentPayload,
+        result.paymentRequirements,
+        result.declaredExtensions,
+        { request: context },
+      );
+      if (!settled.success) {
+        sendInstructions(res, settled.response);
+        return;
+      }
+      const evidence = finalizedSettlementIdentity(
+        {
+          network: settled.network,
+          payer: settled.payer ?? '',
+          transaction: settled.transaction,
+        },
+        authorized,
+      );
+      const settledProductId = idFromPath(req.path, 'binary_asset');
+      if (options.journal && !settledProductId) {
+        throw new Error('Settled purchase path did not resolve to a product id.');
+      }
+      const persisted =
+        options.journal && settledProductId
+          ? (
+              await options.journal.saveIfAbsent(reference, {
+                version: 1,
+                productId: settledProductId,
+                ...evidence,
+              })
+            ).receipt
+          : evidence;
+      Object.entries(settled.headers).forEach(([key, value]) => res.setHeader(key, value));
+      res.locals[X402_SETTLEMENT_LOCAL] = {
+        network: persisted.network,
+        payer: persisted.payer,
+        transaction: persisted.transaction,
+      };
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+async function recoverSettledEvidence(
+  options: SettlementFirstOptions,
+  reference: string,
+  productId: string | undefined,
+  authorized: { network: string; payer: string },
+) {
+  if (options.entitlements && productId) {
+    const issued = await options.entitlements.find(reference, productId);
+    if (issued) {
+      return finalizedSettlementIdentity(issued.payment, authorized);
+    }
+  }
+  if (!options.journal || !productId) return undefined;
+  const receipt = await options.journal.find(reference);
+  // The journal is keyed by the payment header digest alone, so the receipt's
+  // own product binding is the only thing preventing one settled header from
+  // recovering settlement evidence for every product in the catalog.
+  if (!receipt || receipt.productId !== productId) return undefined;
+  return finalizedSettlementIdentity(receipt, authorized);
 }
 
 export function x402CatalogPaywall(config: X402CatalogConfig) {
@@ -308,6 +507,59 @@ function catalogEntryForRequest(req: Request, expectedResourceType: ResourceType
   return entry && entryResourceType === expectedResourceType ? entry : undefined;
 }
 
+function buildHttpResourceServer(
+  config: X402Config,
+  resource: ProtectedResource,
+): x402HTTPResourceServer {
+  const caipNetwork = normalizeNetwork(config.network);
+  const facilitatorClient = new HTTPFacilitatorClient(
+    facilitatorConfigForNetwork(config.facilitatorUrl, caipNetwork),
+  );
+  const evmScheme = new ExactEvmScheme().registerMoneyParser(async (amount, parserNetwork) => {
+    const usdc = USDC_BY_NETWORK[parserNetwork];
+    if (!usdc) return null;
+    return {
+      amount: String(Math.round(amount * 1_000_000)),
+      asset: usdc.asset,
+      extra: {
+        assetTransferMethod: 'eip3009',
+        name: usdc.name,
+        version: usdc.version,
+      },
+    };
+  });
+  const server = new x402ResourceServer(facilitatorClient).register(caipNetwork, evmScheme);
+  const routes = {
+    [resource.routePattern]: {
+      accepts: {
+        scheme: 'exact',
+        network: caipNetwork,
+        payTo: config.walletAddress,
+        price: (context) => priceForRequest(context.adapter.getPath(), resource.resourceType),
+        maxTimeoutSeconds: 300,
+      },
+      description: resource.description,
+      mimeType: resource.mimeType,
+      serviceName: 'Curatoria',
+      tags: ['curatoria', 'design-systems', resource.resourceType],
+    },
+  } as RoutesConfig;
+  return new x402HTTPResourceServer(server, routes);
+}
+
+function sendInstructions(
+  res: Response,
+  response: { status: number; headers: Record<string, string>; body?: unknown; isHtml?: boolean },
+): void {
+  res.status(response.status);
+  Object.entries(response.headers).forEach(([key, value]) => res.setHeader(key, value));
+  if (response.isHtml) {
+    res.send(response.body);
+  } else {
+    res.json(response.body ?? {});
+  }
+}
+
 function priceForRequest(path: string, expectedResourceType: ResourceType): string {
   const id = idFromPath(path, expectedResourceType);
   const entry = id ? findEntry(id) : undefined;
@@ -323,7 +575,9 @@ function idFromPath(path: string, expectedResourceType: ResourceType): string | 
   const pattern =
     expectedResourceType === 'bundle_zip'
       ? /^\/packs\/([^/]+)\/download$/i
-      : /^\/design-systems\/([^/]+)$/i;
+      : expectedResourceType === 'binary_asset'
+        ? /^\/assets\/([^/]+)\/purchase$/i
+        : /^\/design-systems\/([^/]+)$/i;
   const match = normalizedPath.match(pattern);
   return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 }

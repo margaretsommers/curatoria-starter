@@ -1,0 +1,46 @@
+{
+  "shared": [
+    ".env.example",
+    "package.json",
+    "package-lock.json",
+    "starter-export.manifest.json",
+    "tsconfig.json",
+    "src/",
+    "scripts/",
+    "scripts/preview-paid-psd.ts",
+    "scripts/failure-drills.ts",
+    "scripts/prepare-rollback-packet.ts",
+    "scripts/generate-proof-report.ts",
+    "scripts/generate-psd-fixture.ts",
+    "scripts/generate-review-manifest.ts",
+    "scripts/verify-browser-download.ts",
+    "apps/curatoria-service/",
+    "docs/creator/",
+    "docs/acceptable-use-and-content-ownership.md",
+    "LICENSE.md",
+    "test/fixtures/"
+  ],
+  "generated": [
+    ".gitignore",
+    "README.md",
+    "AGENTS.md",
+    "TESTING.md",
+    "design-systems/",
+    "public/"
+  ],
+  "preserved": [
+    ".git/",
+    ".agents/"
+  ],
+  "forbidden": [
+    ".env",
+    ".env.",
+    "docs/operator/",
+    "src/shopify-agentic/",
+    "src/export-starter.test.ts",
+    "stash/",
+    "starter-export/",
+    "design-systems/*.psd",
+    "public/styles-shader.css"
+  ]
+}
