@@ -24,6 +24,7 @@ Track A is the default path: agents can read the full catalog for free and pay o
 | **Base Sepolia test funds** | Test ETH for gas and test USDC for fake payments | Lets you run optional paid proof without real money | Optional paid testnet proof only | Faucet notes and buyer wallet address outside git |
 | **Coinbase Developer Platform (CDP)** | Coinbase developer portal for faucets and mainnet x402 facilitator keys | Testnet faucet access is optional; mainnet facilitator auth needs `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` | Optional for testnet faucet; required before Base mainnet facilitator use | Host secrets/env vars for mainnet keys; do not put keys in `.env.example` |
 | **Storage provider** | Place where product files live, such as local files, Google Drive, Dropbox, or HTTPS URLs | The service delivers product bytes after payment | Local `design-systems/` for first run; external storage only when moving beyond demo files | Registry entries, file URLs/IDs, and provider credentials as needed |
+| **Blob storage (paid binary assets only)** | Immutable object storage for paid PSD/binary files, imported via `publish-asset` | Markdown and zip products never need this row — only binary-asset products like PSDs | Local development: nothing to set up, a filesystem store under `.local-blob/` is used automatically. Production: private Vercel Blob (see `BLOB_READ_WRITE_TOKEN`/`BLOB_STORE_ID` below) | `.env` locally only if testing against real Vercel Blob; host secret/env var in production |
 
 For the first local Track A run, the shortest real preflight is: GitHub access, Node/npm installed, a Base-compatible payout address, and a generated `ADMIN_API_KEY`. Vercel/Railway, CDP mainnet keys, paid buyer-wallet setup, custom domain, and production storage can wait until deploy, testnet paid proof, or mainnet launch.
 
@@ -119,11 +120,11 @@ Detailed steps: [`02-wallet-basics.md`](02-wallet-basics.md).
 | | |
 | --- |
 | **What for** | Paying your own `402` challenges during optional paid proof (`npm run bug-bash -- --paid`). Simulates what an agent buyer does. |
-| **Signup** | Authenticate via `npx awal@2.10.0 auth login` after installing the Coinbase MCP / awal tooling |
+| **Signup** | Install and review awal separately, then authenticate with `/absolute/path/to/awal auth login`; never install tooling during a payment flow |
 | **Free tier** | Testnet USDC from Circle faucet; mainnet requires real USDC in the buyer wallet |
 | **When** | Only if you want automated paid self-proof. **Not required** to clone, run smoke tests, or launch — most creators validate unpaid `402` responses and let real agents pay first. |
 
-Set `AWAL_PAID_TEST=1` only after awal is authenticated and the buyer wallet is funded. See [`06-test-on-testnet.md`](06-test-on-testnet.md).
+Set `AWAL_EXECUTABLE` to that absolute path and `AWAL_PAID_TEST=1` only after awal is authenticated and the buyer wallet is funded. See [`06-test-on-testnet.md`](06-test-on-testnet.md).
 
 ### Vercel
 
@@ -207,6 +208,14 @@ Copy `.env.example` to `.env` locally. Never commit `.env`. Set the same variabl
 | `DROPBOX_APP_KEY` | Mode B only | Dropbox app console | OAuth refresh for private Dropbox paths | Mode A link-share needs no Dropbox env vars |
 | `DROPBOX_APP_SECRET` | Mode B only | Dropbox app console | OAuth refresh | Mode B only |
 | `DROPBOX_REFRESH_TOKEN` | Mode B only | Dropbox OAuth flow | Long-lived access for private files | Mode B only |
+| `ENTITLEMENT_SIGNING_KEY` | **Yes, for paid binary assets (PSD, etc.)** | You generate at least 32 random bytes | HMAC key that signs the short-lived entitlement returned by a binary-asset purchase. Production fails closed if missing. | Same dedicated key in every environment; rotate via `ENTITLEMENT_PREVIOUS_SIGNING_KEYS` |
+| `ENTITLEMENT_STORE_INDEX_KEY` | Production paid binaries | You generate at least 32 random bytes | HMAC key for Blob entitlement index paths. Independent of `ENTITLEMENT_SIGNING_KEY` so recover still works after signing-key rotation. Production fails closed if missing. | Same dedicated key in every environment that must recover existing purchases |
+| `BLOB_MODE` | No | You choose: unset, `local`, or `vercel` | Selects the binary-asset storage backend. Unset defaults to local filesystem storage in development (no Vercel account needed) or Vercel Blob when the vars below are set; `local` forces the filesystem store; `vercel` requires it. | **Production always requires Vercel Blob** — `local` is refused outside development |
+| `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID` | Production paid binaries (or local import against real Vercel Blob) | Vercel dashboard → Storage → Blob | Private Vercel Blob credentials for immutable PSD storage and signed downloads | Prefer OIDC (`BLOB_STORE_ID` + managed token) on connected Vercel deployments |
+| `LOCAL_BLOB_DIR` | No (default `.local-blob/`) | You choose a path | Where the local filesystem Blob store keeps objects when no Vercel Blob is configured | Development only |
+| `LOCAL_BLOB_SECRET` | No | You generate at least 32 random bytes | Signs local Blob download URLs so they survive a dev server restart; unset uses a fresh per-process secret | Development only |
+
+In-app rate limits on purchase/recover/redeem are a per-instance fixed-window (no Redis or Postgres). On Vercel each instance has its own counters. Distributed enforcement is an external WAF gate.
 
 ### Facilitator URLs by network
 

@@ -49,64 +49,119 @@
   };
   const DEFAULT_ALLOWED_NETWORKS = ['eip155:8453', 'eip155:84532'];
   const DEFAULT_MAX_AMOUNT_ATOMIC = '10000';
+  const WALLET_STATES = new Set([
+    'disconnected',
+    'connecting',
+    'unlock',
+    'wrong-network',
+    'confirm',
+    'sign',
+    'paid',
+    'retryable',
+  ]);
+  let currentState = {
+    name: 'disconnected',
+    message: 'Connect a browser wallet to continue.',
+  };
+  const subscribers = new Set();
 
-  async function pay({ url, challenge, entry }) {
+  async function pay({ url, challenge, entry, onStateChange }) {
+    const notify = state => {
+      currentState = state;
+      if (typeof onStateChange === 'function') onStateChange(state);
+      subscribers.forEach(listener => listener(state));
+    };
     const paymentRequired = decodePaymentRequired(challenge);
     const accepted = validatePaymentRequirement({ url, paymentRequired, entry });
     const network = NETWORKS[accepted.network];
 
-    if (typeof root.confirm === 'function') {
-      const approved = root.confirm(
-        [
-          `Pay ${formatAtomicUsdc(accepted.amount)} USDC for ${entry.name || entry.id}?`,
-          `Network: ${accepted.network}`,
-          `Pay to: ${accepted.payTo}`,
-          `Resource: ${new URL(url).pathname}`,
-        ].join('\n'),
-      );
-      if (!approved) {
-        throw new Error('Payment cancelled before wallet authorization.');
-      }
-    }
-
     const ethereum = root.ethereum;
     if (!ethereum || typeof ethereum.request !== 'function') {
+      notify({ name: 'disconnected', message: 'No compatible browser wallet is connected.' });
       throw new Error('No browser wallet found. Install or unlock Coinbase Wallet or another EIP-1193 wallet, then try again.');
     }
 
-    await switchToNetwork(ethereum, network);
-
+    notify({ name: 'connecting', message: 'Connecting to the browser wallet.' });
+    notify({ name: 'unlock', message: 'Unlock the wallet and choose an account.' });
     const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
     const from = Array.isArray(accounts) ? accounts[0] : undefined;
     if (!isAddress(from)) {
       throw new Error('Wallet did not return a valid payer address.');
     }
 
-    const authorization = buildAuthorization(accepted, from);
-    const typedData = buildTypedData(accepted, authorization, network);
-    const signature = await ethereum.request({
-      method: 'eth_signTypedData_v4',
-      params: [from, JSON.stringify(typedData)],
-    });
+    notify({ name: 'wrong-network', message: `Confirm or switch to ${network.chainName}.` });
+    await switchToNetwork(ethereum, network);
 
-    if (typeof signature !== 'string' || !/^0x[0-9a-fA-F]{130}$/.test(signature)) {
-      throw new Error('Wallet returned an invalid EIP-712 signature.');
-    }
-
-    return {
-      headers: {
-        'PAYMENT-SIGNATURE': encodePaymentPayload({
-          x402Version: 2,
-          resource: paymentRequired.resource,
-          accepted,
-          payload: {
-            signature,
-            authorization,
-          },
-          extensions: paymentRequired.extensions || {},
-        }),
-      },
+    let invalidated = false;
+    const invalidate = () => {
+      invalidated = true;
+      notify({
+        name: 'retryable',
+        message: 'Wallet account or chain changed. Start again to authorize fresh details.',
+      });
     };
+    ethereum.on?.('accountsChanged', invalidate);
+    ethereum.on?.('chainChanged', invalidate);
+    try {
+      notify({
+        name: 'confirm',
+        message: `Confirm ${formatAtomicUsdc(accepted.amount)} USDC for ${entry.filename || entry.download_filename || entry.name || entry.id}.`,
+      });
+      if (typeof root.confirm === 'function') {
+        const approved = root.confirm(
+          [
+            `Pay ${formatAtomicUsdc(accepted.amount)} USDC for ${entry.name || entry.id}?`,
+            `Filename: ${entry.download_filename || entry.filename || entry.id}`,
+            `Asset: ${accepted.asset}`,
+            `Network: ${accepted.network}`,
+            `Pay to: ${accepted.payTo}`,
+            `Resource: ${new URL(url).pathname}`,
+          ].join('\n'),
+        );
+        if (!approved) {
+          throw new Error('Payment cancelled before wallet authorization.');
+        }
+      }
+      if (invalidated) throw new Error('Wallet changed before authorization.');
+
+      const authorization = buildAuthorization(accepted, from);
+      const typedData = buildTypedData(accepted, authorization, network);
+      notify({ name: 'sign', message: 'Review and sign the exact wallet authorization.' });
+      const signature = await ethereum.request({
+        method: 'eth_signTypedData_v4',
+        params: [from, JSON.stringify(typedData)],
+      });
+      if (invalidated) throw new Error('Wallet changed while authorization was pending.');
+      if (typeof signature !== 'string' || !/^0x[0-9a-fA-F]{130}$/.test(signature)) {
+        throw new Error('Wallet returned an invalid EIP-712 signature.');
+      }
+      notify({ name: 'paid', message: 'Authorization signed; waiting for settlement.' });
+      return {
+        headers: {
+          'PAYMENT-SIGNATURE': encodePaymentPayload({
+            x402Version: 2,
+            resource: paymentRequired.resource,
+            accepted,
+            payload: {
+              signature,
+              authorization,
+            },
+            extensions: paymentRequired.extensions || {},
+          }),
+        },
+      };
+    } catch (error) {
+      if (!invalidated) {
+        notify({
+          name: 'retryable',
+          message: error instanceof Error ? error.message : 'Wallet authorization failed.',
+        });
+      }
+      throw error;
+    } finally {
+      ethereum.removeListener?.('accountsChanged', invalidate);
+      ethereum.removeListener?.('chainChanged', invalidate);
+    }
   }
 
   function decodePaymentRequired(challenge) {
@@ -179,9 +234,15 @@
       throw new Error('Payment challenge is missing token EIP-712 domain metadata.');
     }
 
-    const challengeMime = paymentRequired.resource?.mimeType;
-    if (entry?.mime_type && challengeMime && normalizeMime(challengeMime) !== normalizeMime(entry.mime_type)) {
-      throw new Error('Payment challenge MIME type does not match the catalog entry.');
+    const challengeMime = normalizeMime(paymentRequired.resource?.mimeType);
+    const expectedChallengeMime =
+      entry?.resource_type === 'binary_asset' ? 'application/json' : normalizeMime(entry?.mime_type);
+    if (!challengeMime || challengeMime !== expectedChallengeMime) {
+      throw new Error(
+        entry?.resource_type === 'binary_asset'
+          ? 'Binary asset payment challenge must describe an application/json purchase response.'
+          : 'Payment challenge MIME type does not match the catalog entry.',
+      );
     }
 
     return accepted;
@@ -309,9 +370,12 @@
     if (!id) {
       throw new Error('Catalog entry is missing an id.');
     }
-    const expectedPath = (entry.resource_type || 'design_md') === 'bundle_zip'
+    const resourceType = entry.resource_type || 'design_md';
+    const expectedPath = resourceType === 'bundle_zip'
       ? `/packs/${id}/download`
-      : `/design-systems/${id}`;
+      : resourceType === 'binary_asset'
+        ? `/assets/${id}/purchase`
+        : `/design-systems/${id}`;
     if (url.pathname !== expectedPath) {
       throw new Error('Payment challenge route does not match the catalog entry type.');
     }
@@ -379,7 +443,18 @@
     return `0x${Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')}`;
   }
 
-  const adapter = { pay };
+  const adapter = {
+    pay,
+    getState() {
+      return { ...currentState };
+    },
+    subscribe(listener) {
+      if (typeof listener !== 'function') throw new Error('Wallet state listener must be a function.');
+      subscribers.add(listener);
+      listener({ ...currentState });
+      return () => subscribers.delete(listener);
+    },
+  };
   Object.defineProperty(adapter, '__testing', {
     enumerable: false,
     value: {
@@ -391,6 +466,7 @@
       paymentPolicy,
       usdToAtomicUsdc,
       validatePaymentRequirement,
+      walletStates: Array.from(WALLET_STATES),
     },
   });
 

@@ -95,7 +95,7 @@ When you use the **CDP Facilitator** on mainnet (`FACILITATOR_URL=https://api.cd
 Verify discovery:
 
 ```bash
-npx awal@2.10.0 x402 bazaar search YOUR_DOMAIN
+/absolute/path/to/awal x402 bazaar search YOUR_DOMAIN
 ```
 
 Indexing is asynchronous (can take hours). Asset routes (`/design-systems/:id`, `/packs/:id/download`) appear as template URLs after settlement. The free well-known catalog is **not** a Bazaar row — agents read it directly.

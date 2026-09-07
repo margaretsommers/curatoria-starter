@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
 import { requestBaseUrl } from './discovery';
-import { REPO_ROOT } from './paths';
+import { PUBLIC_DIR } from './paths';
 
 export const AGENT_SKILLS_DISCOVERY_SCHEMA =
   'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
@@ -38,8 +38,8 @@ export const AGENT_SKILLS_REGISTRY: AgentSkillRegistryEntry[] = [
     description:
       'Discover Curatoria x402 catalogs for free and pay per markdown or zip asset in USDC on Base. Use for curatoria.dev buyer flows and design-catalog.json commerce.',
     sourcePath: path.join(
-      REPO_ROOT,
-      'public/.well-known/agent-skills/curatoria-buyer/SKILL.md',
+      PUBLIC_DIR,
+      '.well-known/agent-skills/curatoria-buyer/SKILL.md',
     ),
     urlPath: '/.well-known/agent-skills/curatoria-buyer/SKILL.md',
   },
@@ -49,8 +49,8 @@ export const AGENT_SKILLS_REGISTRY: AgentSkillRegistryEntry[] = [
     description:
       'End-to-end creator onboarding for curatoria-starter: wallet setup, storage, publishing, testnet proof, and mainnet go-live.',
     sourcePath: path.join(
-      REPO_ROOT,
-      'public/.well-known/agent-skills/creator-setup/SKILL.md',
+      PUBLIC_DIR,
+      '.well-known/agent-skills/creator-setup/SKILL.md',
     ),
     urlPath: '/.well-known/agent-skills/creator-setup/SKILL.md',
   },

@@ -1,13 +1,10 @@
 import fs from 'fs';
-import path from 'path';
 import { Request, Response } from 'express';
 import { listActive, readCatalog } from './catalog';
-import { requestBaseUrl } from './discovery';
-import { SITEMAP_PATH } from './paths';
-import { DesignSystemEntry } from './types';
+import { productAccessPath, requestBaseUrl } from './discovery';
+import { resolvePublicPath } from './paths';
 
-export const SITEMAP_OUTPUT_PATH = SITEMAP_PATH;
-const PUBLIC_DIR = path.join(__dirname, '../public');
+export const SITEMAP_OUTPUT_PATH = resolvePublicPath('sitemap.xml');
 
 const STATIC_PAGES: Array<{ path: string; priority?: string; files?: string[] }> = [
   { path: '/', priority: '1.0' },
@@ -34,14 +31,9 @@ function escapeXml(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function productAccessPath(entry: DesignSystemEntry): string {
-  const isBundle = (entry.resource_type ?? 'design_md') === 'bundle_zip';
-  return isBundle ? `/packs/${entry.id}/download` : `/design-systems/${entry.id}`;
-}
-
 function publicFileExists(files: string[] | undefined): boolean {
   if (!files) return true;
-  return files.some(file => fs.existsSync(path.join(PUBLIC_DIR, file)));
+  return files.some(file => fs.existsSync(resolvePublicPath(file)));
 }
 
 function formatLastmod(iso?: string): string | undefined {

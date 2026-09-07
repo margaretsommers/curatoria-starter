@@ -42,6 +42,12 @@
             paid proof, or mainnet launch.
           </p>
           <p>
+            <strong>Testing for Curatoria?</strong> Use the public
+            <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/TESTING.md" target="_blank" rel="noreferrer">TESTING.md guide</a>
+            to run a fresh clone, time the local install separately from account setup, and send
+            useful feedback to <code>curatoria.dev@pm.me</code>.
+          </p>
+          <p>
             <strong>Agent setup prompt:</strong> paste this into Cursor or another agentic coding app
             to start an interactive setup flow.
           </p>
@@ -52,12 +58,6 @@ Use the Curatoria creator setup workflow at:
 https://curatoria.dev/.well-known/agent-skills/creator-setup/SKILL.md
 
 Guide me step by step. Start by asking whether I want you to run commands or explain them, then walk me through clone/install, payout wallet, local .env, local dev, smoke/bug-bash, publishing my first product, and only then deploy/mainnet. Do not ask for private keys or seed phrases. Keep docs links secondary unless I need detail.</code></pre>
-          <p>
-            <strong>Testing for Curatoria?</strong> Use the public
-            <a href="https://github.com/margaretsommers/curatoria-starter/blob/main/TESTING.md" target="_blank" rel="noreferrer">TESTING.md guide</a>
-            to run a fresh clone, time the local install separately from account setup, and send
-            useful feedback to <code>curatoria.dev@pm.me</code>.
-          </p>
           <p>
             <strong>Not in this starter yet:</strong> no-terminal publishing, iCloud/CloudKit
             follow-through, and guaranteed external Bazaar indexing.
@@ -85,13 +85,14 @@ Guide me step by step. Start by asking whether I want you to run commands or exp
         <section class="docs-section">
           <h2>What works in this starter</h2>
           <ol class="steps">
-            <li>Well-known returns the free full catalog with names, prices, and <code>access_url</code>; storage paths stay private.</li>
+            <li>Well-known returns the free full catalog — <code>design_systems[]</code> with names, prices, and <code>access_url</code> (no storage paths).</li>
             <li><code>GET /catalog</code> is a free alias of the same listing.</li>
             <li>Protected asset routes return <code>402</code> until payment; then markdown or zip bytes.</li>
             <li>Each paid route declares Bazaar discovery metadata automatically in <code>402</code> challenges.</li>
-            <li><code>npm run agent-download</code> validates catalog metadata, spend boundaries, and binary-safe local file saves through a fresh signer adapter/private-key proof path.</li>
             <li>Local files under <code>design-systems/</code> are the simplest source of truth today.</li>
+            <li><code>npm run agent-download</code> validates catalog metadata, spend boundaries, and binary-safe local file saves through a fresh signer adapter/private-key proof path.</li>
             <li>MCP is later agent-tool packaging. Coinbase owns payment; Curatoria owns catalog interpretation, save destination, validation, and proof.</li>
+            <li>External Bazaar indexing still depends on third-party directories finding your catalog URL.</li>
           </ol>
         </section>
 

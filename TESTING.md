@@ -125,6 +125,8 @@ Expected:
 
 - `/health` returns JSON with `"status":"ok"` or equivalent healthy status.
 - `/.well-known/design-catalog.json` returns a full catalog with design systems.
+  Markdown `access_url` values use `/design-systems/:id`; zip uses
+  `/packs/:id/download`. A later `binary_asset` uses `/assets/:id/purchase`.
 - `npm run smoke` exits 0 and includes `local fixture integrity`.
 - The fixture integrity line reports byte size and SHA-256 for local demo files.
   In the starter export, it also validates PNG, PDF, JSON, font signatures, and
@@ -161,6 +163,13 @@ Expected:
   `awal x402 pay --json` body data as a valid binary asset download. The agent
   downloader uses a fresh signer adapter/private-key proof path before saving
   paid responses as raw bytes.
+- A wallet signs payment. It is not a file store. Do not look in the wallet for
+  a downloaded PSD or other binary.
+- The starter demo catalog is markdown plus zip. A `binary_asset` product uses
+  `GET /assets/:id/purchase` (entitlement JSON after payment) and
+  `npm run publish-asset` to publish. Do not add a binary product during this
+  timed first-run unless the chapter-06 binary check is the thing you are
+  testing.
 
 Result:
 

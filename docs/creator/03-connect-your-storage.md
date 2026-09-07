@@ -5,8 +5,12 @@
 
 Curatoria can sell a product whose bytes live in one of four places. You pick the
 source per product when you publish it. Only catalog metadata (name, price, tags)
-ever lives in your repo — for URL, Google Drive, and Dropbox sources, the file itself stays
-where it is and is fetched on demand only after a buyer pays.
+ever lives in your repo.
+
+Markdown and zip products may still fetch their source at purchase time. Binary
+assets such as PSDs are different: you import them into private Blob storage
+first, then buyers pay for a JSON entitlement. The paid transfer never streams
+from Google Drive or Dropbox.
 
 | Source | Use it when | Config needed |
 | --- | --- | --- |
@@ -44,6 +48,26 @@ rewritten payload.
 Corporate networks can block wallets, Coinbase/CDP, Google Drive, Dropbox, or
 your source host. If a buyer pays successfully but delivery fails, check the
 server logs for source-fetch errors before assuming the x402 settlement failed.
+
+## Binary intake versus on-demand fetch
+
+Use `npm run publish-asset` for PSDs and other binaries. Put the public Drive
+or Dropbox link in a named environment variable; never pass the link as a shell
+argument. Curatoria hashes the local original, fetches the provider copy,
+stops if they differ, and stores immutable private bytes. Public discovery keeps
+filename, MIME, bytes, SHA-256, provider label, and `integrity_status` — not
+the source URL, file ID, or Blob pathname.
+
+**Public Drive and Dropbox links are intake bearer secrets.** Anyone with the
+link can read the original file outside Curatoria. Treat file IDs and share
+URLs like passwords: keep them in local `.env`, not in chat, commits, docs, or
+starter copies.
+
+A `GOOGLE_API_KEY` is a project credential. It does not authorize Curatoria to
+read another person's private Drive files, and it does not replace "anyone with
+the link" sharing for binary import. Private Drive or Dropbox OAuth intake for
+binary assets remains deferred. Dropbox Mode B below still applies only to
+markdown and zip products that fetch at purchase time.
 
 ## Option A — Local folder (default)
 
@@ -120,7 +144,10 @@ npm run publish-design -- \
 ```
 
 You can pass either the raw file ID (`1AbC...XYZ`) or paste the whole share URL —
-Curatoria extracts the ID for you.
+Curatoria extracts the ID for you. Folder links (`/folders/`), Google Docs,
+Sheets, or Slides URLs, and links that include a username or password in the
+URL are rejected — share the uploaded **file** (`/file/d/` or `open?id=`), not
+a folder, a Workspace document, or a URL with credentials in it.
 
 **Private or large files (recommended for production):** Create a Google Cloud API
 key with the **Drive API** enabled and set it in `.env`:
@@ -162,9 +189,13 @@ npm run publish-pack -- \
 ```
 
 Curatoria validates Dropbox hosts and rewrites share links from `?dl=0` to
-`?dl=1` at fetch time so paid buyers receive file bytes directly. The share URL
-stays in `design-systems/.registry.json`; it is never included in well-known,
-`/catalog`, or `402` responses.
+`?dl=1` at fetch time so paid buyers receive file bytes directly. Only file
+share paths (`/s/` or `/scl/fi/`) are accepted. Dropbox Transfer (`/t/`),
+folders (`/scl/fo/` or classic `/sh/`), Paper, other `/scl/` links, and URLs
+that include a username or password are rejected — use a file share link, not
+Transfer, a folder, Paper, or a URL with credentials in it.
+The share URL stays in `design-systems/.registry.json`; it is never included in
+well-known, `/catalog`, or `402` responses.
 
 ### Mode B (private files with OAuth)
 

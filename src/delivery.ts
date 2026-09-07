@@ -33,7 +33,7 @@ export function contentDispositionAttachment(filename: string): string {
   return `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`;
 }
 
-export function normalizeDownloadMimeType(mimeType: string | undefined): string {
+export function normalizeDownloadMimeType(mimeType: string | null | undefined): string {
   const mediaType = (mimeType ?? '').split(';', 1)[0].trim().toLowerCase();
   return mediaType || 'application/octet-stream';
 }

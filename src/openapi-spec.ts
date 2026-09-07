@@ -50,11 +50,24 @@ export function buildOpenApiDocument(baseUrl: string): Record<string, unknown> {
           description:
             'x402 v2 payment signature presented after receiving HTTP 402 with PAYMENT-REQUIRED on paid routes.',
         },
+        X402RecoveryProof: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'PAYMENT-SIGNATURE',
+          description:
+            'The exact original payment signature used for an already-settled purchase. Recovery never verifies or settles it again.',
+        },
         AdminApiKey: {
           type: 'apiKey',
           in: 'header',
           name: 'X-Admin-Key',
           description: 'Operator API key for admin publish routes.',
+        },
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'Curatoria entitlement',
+          description: 'Short-lived product-bound entitlement returned by the paid purchase route.',
         },
       },
     },
@@ -149,6 +162,88 @@ export function buildOpenApiDocument(baseUrl: string): Record<string, unknown> {
             '402': {
               description: 'x402 payment required',
             },
+          },
+        },
+      },
+      '/assets/{id}/purchase': {
+        get: {
+          summary: 'Purchase a binary asset entitlement',
+          operationId: 'purchaseBinaryAsset',
+          'x-payment-info': X402_PAYMENT_INFO,
+          security: [{ X402Payment: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Short-lived signed entitlement after successful x402 settlement',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' },
+                },
+              },
+            },
+            '402': { description: 'x402 payment required' },
+            '503': { description: 'Entitlement delivery is not configured' },
+          },
+        },
+      },
+      '/assets/{id}/recover': {
+        post: {
+          summary: 'Recover an already-settled binary asset entitlement',
+          operationId: 'recoverBinaryAsset',
+          security: [{ X402RecoveryProof: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            '200': {
+              description:
+                'The existing immutable entitlement for the exact original payment signature; no payment is settled again',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' },
+                },
+              },
+            },
+            '404': { description: 'No settled entitlement exists for this payment' },
+            '401': { description: 'Recovery proof is invalid or the entitlement expired' },
+          },
+        },
+      },
+      '/assets/{id}/redeem': {
+        get: {
+          summary: 'Redeem an entitlement for a private signed Blob URL',
+          operationId: 'redeemBinaryAsset',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Object-scoped signed download URL valid for approximately 60 seconds',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' },
+                },
+              },
+            },
+            '401': { description: 'Invalid or expired entitlement' },
           },
         },
       },

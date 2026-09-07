@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { listActive, readCatalog } from './catalog';
-import { requestBaseUrl } from './discovery';
-import { DesignSystemEntry } from './types';
+import { productAccessPath, requestBaseUrl } from './discovery';
 
 export type X402DiscoveryDocument = {
   version: number;
@@ -23,11 +22,6 @@ const NETWORK_CAIP_IDS: Record<string, string> = {
   polygon: 'eip155:137',
 };
 
-function paidResourcePath(entry: DesignSystemEntry): string {
-  const isBundle = (entry.resource_type ?? 'design_md') === 'bundle_zip';
-  return isBundle ? `/packs/${entry.id}/download` : `/design-systems/${entry.id}`;
-}
-
 export function normalizeX402Network(network: string): string {
   return NETWORK_CAIP_IDS[network] ?? network;
 }
@@ -47,7 +41,7 @@ export function buildX402DiscoveryDocument(
     facilitator: options.facilitatorUrl,
     network: normalizeX402Network(options.network),
     payTo: wallet,
-    resources: listActive().map(entry => `${origin}${paidResourcePath(entry)}`),
+    resources: listActive().map(entry => `${origin}${productAccessPath(entry)}`),
     ownershipProofs: wallet ? [wallet] : [],
     instructions:
       'Probe any resource URL without PAYMENT-SIGNATURE to receive HTTP 402 with PAYMENT-REQUIRED (x402 v2). Retry with PAYMENT-SIGNATURE after USDC settlement on Base.',

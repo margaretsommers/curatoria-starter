@@ -33,15 +33,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { resolveLocalDesignSystemsFile } from '../src/paths';
-
-// Resolve src modules relative to this script (handles both ts-node and compiled)
-const catalogPath = path.join(__dirname, '../src/catalog');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { appendEntry } = require(catalogPath) as typeof import('../src/catalog');
-const sourcesPath = path.join(__dirname, '../src/sources');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { buildSource } = require(sourcesPath) as typeof import('../src/sources');
+import { appendEntry } from '../src/catalog';
+import { resolveDesignSystemInputPath } from '../src/paths';
+import { buildSource } from '../src/sources';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const args: Record<string, string> = {};
@@ -81,10 +75,14 @@ if (isNaN(priceNum) || priceNum <= 0) {
 // ─── Resolve storage source (local zip, remote URL, or Google Drive) ──────────
 
 let built: { file: string; source?: import('../src/types').EntrySource };
+let localZipPath: string | undefined;
 try {
+  localZipPath = args.zip
+    ? resolveDesignSystemInputPath(args.zip)
+    : undefined;
   built = buildSource({
     id: args.id,
-    file: args.zip,
+    file: localZipPath,
     url: args.url,
     gdriveId: args['gdrive-id'],
     dropboxUrl: args['dropbox-url'],
@@ -98,20 +96,12 @@ try {
 
 // For local bundles, confirm the .zip is actually on disk before registering.
 if (!built.source && args.zip) {
-  let zipPath: string;
-  try {
-    zipPath = resolveLocalDesignSystemsFile(args.zip);
-  } catch (err) {
-    console.error(`\n${String(err instanceof Error ? err.message : err)}\n`);
+  if (!localZipPath || !fs.existsSync(localZipPath)) {
+    console.error(`\nZip file not found: ${args.zip}`);
+    console.error('Make sure the bundle file exists first.\n');
     process.exit(1);
   }
-  if (!fs.existsSync(zipPath)) {
-    console.error(`\nZip file not found: ${zipPath}`);
-    console.error('Place the bundle under design-systems/ first, then publish with:');
-    console.error('  --zip design-systems/your-bundle.zip\n');
-    process.exit(1);
-  }
-  if (path.extname(zipPath).toLowerCase() !== '.zip') {
+  if (path.extname(localZipPath).toLowerCase() !== '.zip') {
     console.error('--zip must point to a .zip file');
     process.exit(1);
   }
@@ -133,21 +123,26 @@ const entry = {
   active: true,
 };
 
-appendEntry(entry);
-
-console.log('');
-console.log(`  ✓ Published bundle "${entry.name}"`);
-console.log(`    ID:     ${entry.id}`);
-console.log(
-  `    Source: ${
-    entry.source
-      ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id ?? entry.source.share_url ?? entry.source.dropbox_path})`
-      : `local (${entry.bundle_file})`
-  }`,
-);
-console.log(`    Price:  $${entry.price_usd} USDC per download`);
-if (entry.tags.length) console.log(`    Tags:  ${entry.tags.join(', ')}`);
-console.log('');
-console.log('  Download URL (once server is running):');
-console.log(`    http://localhost:3000/packs/${entry.id}/download`);
-console.log('');
+appendEntry(entry)
+  .then(() => {
+    console.log('');
+    console.log(`  ✓ Published bundle "${entry.name}"`);
+    console.log(`    ID:     ${entry.id}`);
+    console.log(
+      `    Source: ${
+        entry.source
+          ? `${entry.source.type} (${entry.source.url ?? entry.source.file_id ?? entry.source.share_url ?? entry.source.dropbox_path})`
+          : `local (${entry.bundle_file})`
+      }`,
+    );
+    console.log(`    Price:  $${entry.price_usd} USDC per download`);
+    if (entry.tags.length) console.log(`    Tags:  ${entry.tags.join(', ')}`);
+    console.log('');
+    console.log('  Download URL (once server is running):');
+    console.log(`    http://localhost:3000/packs/${entry.id}/download`);
+    console.log('');
+  })
+  .catch(error => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });

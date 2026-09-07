@@ -187,6 +187,46 @@ defines the schema and limit logic, but it does not yet expose a public
 disposable-link route; do not claim large-file fallback is live until issuance,
 storage, and counter persistence are wired.
 
+## Buyer Agent Stops Safely
+
+The buyer agent is expected to stop rather than improvise in these cases:
+
+- **Product is absent from the current catalog:** it is not executable. Stop
+  before payment instead of relying on an example ID or stale prompt.
+- **No destination:** supply an explicit directory or full path. The agent must
+  ask before payment.
+- **Destination file exists:** choose replace, number, or cancel. Interactive
+  runs ask; noninteractive runs require an explicit `--on-collision` policy.
+  `--yes` never selects a collision policy or permits overwrite.
+- **Purchase terms differ:** compare amount, chain, token, payee, product,
+  filename, and resource with the catalog. A mismatch is not recoverable by
+  editing the challenge.
+- **Payment succeeded but download stopped:** resume with the private
+  entitlement/resume state. Do not pay again.
+- **Entitlement expired:** decide whether to seek recovery or authorize a new
+  purchase. The agent must not repurchase automatically.
+- **Payment result is inconclusive:** inspect non-paying status or receipt
+  surfaces, then make a human decision. Do not retry a payment with unknown
+  settlement.
+- **Wallet is unavailable:** unlock, fund, or select a reviewed wallet yourself.
+  The agent must not install or fund one during the purchase.
+- **Hash, byte count, MIME, or signature differs:** treat the download as failed,
+  preserve the entitlement for a safe retry, and never repay.
+
+Coinbase Payments MCP has a strict two-call payment sequence:
+`check_payment_requirements`, then one `make_x402_request`. The second call
+returns entitlement JSON only. Send that JSON directly to the Curatoria
+downloader with `--entitlement-stdin --product-id <published-id> --out <path>
+--on-collision <policy>`. Stdin is JSON-only and capped at 1 MiB. This
+continuation invokes no wallet and never retries payment. Never paste the
+entitlement, signed URL, payment signature, or file bytes into chat or logs.
+
+MetaMask and browser downloads need one extra proof step. A browser can silently
+rename a colliding file, so "download started" is not proof that the expected
+path exists. Run a local disk verifier against the actual saved file and require
+the catalog SHA-256, byte count, and PSD `8BPS` signature before reporting
+completion.
+
 ## Work-Machine Decision Tree
 
 If a buyer is on a corporate or school machine and downloads fail, separate the
@@ -230,12 +270,32 @@ npm run publish-pack -- \
   --price 0.03
 ```
 
+For binaries, hash the local PSD first. This does not touch Blob, the catalog,
+Drive, Dropbox, or payment:
+
+```bash
+npm run publish-asset -- \
+  --preflight \
+  --filename starter.psd \
+  --mime image/vnd.adobe.photoshop \
+  --original-file /absolute/path/to/starter.psd
+```
+
 Common causes:
 
 - File does not exist yet.
 - ID contains uppercase letters, spaces, or underscores.
 - Price is missing or not a positive decimal.
 - Bundle path does not end in `.zip`.
+- `--original-file` is missing, relative, empty, or not a PSD (`8BPS`).
+- Dropbox Transfer (`/t/`), a folder share (`/scl/fo/` or `/sh/`), Paper, or another `/scl/` URL was used instead of a file share link (`/s/` or `/scl/fi/`).
+- A Google Drive folder (`/folders/`) or Docs/Sheets/Slides URL was used instead of a file share link (`/file/d/` or `open?id=`).
+- A Dropbox or Google Drive share URL included a username or password; paste a normal share link without credentials in the URL.
+- A provider URL or Drive ID was passed as a CLI flag; it must come from `--source-env`.
+- `BLOB_MODE=vercel` is set without `BLOB_READ_WRITE_TOKEN` or `BLOB_STORE_ID`.
+  Without those variables, development defaults to the local `.local-blob/`
+  store, so a full import works with no Vercel account. `--preflight` needs no
+  storage at all.
 
 ## Production Problems
 

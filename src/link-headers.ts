@@ -1,8 +1,8 @@
-import path from 'path';
 import { Request, Response } from 'express';
-import { PUBLIC_DIR } from './paths';
 import { sendPublicHtml } from './markdown-negotiation';
-const HOMEPAGE_PATH = path.join(PUBLIC_DIR, 'index.html');
+import { resolvePublicPath } from './paths';
+
+const HOMEPAGE_PATH = resolvePublicPath('index.html');
 
 /**
  * RFC 8288 Link header values for the site homepage (RFC 9727 Section 3).

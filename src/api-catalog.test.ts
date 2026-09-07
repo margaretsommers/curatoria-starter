@@ -23,6 +23,12 @@ test('buildOpenApiDocument describes core discovery and paid routes', () => {
 
   assert.ok(spec.paths['/.well-known/design-catalog.json']);
   assert.ok(spec.paths['/design-systems/{id}']);
+  assert.ok(spec.paths['/assets/{id}/purchase']);
+  assert.ok(spec.paths['/assets/{id}/recover']);
+  assert.ok(spec.paths['/assets/{id}/redeem']);
+  assert.deepEqual(spec.paths['/assets/{id}/recover'].post.security, [
+    { X402RecoveryProof: [] },
+  ]);
   assert.ok(spec.paths['/health']);
   assert.equal(spec['x-discovery']?.x402, 'https://curatoria.dev/.well-known/x402');
   assert.equal(spec['x402']?.discovery, 'https://curatoria.dev/.well-known/x402');

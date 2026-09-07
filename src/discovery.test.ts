@@ -71,3 +71,69 @@ test('buildCatalogEntry publishes preview and license metadata without storage s
   assert.equal('file' in catalogEntry, false);
   assert.equal('source' in catalogEntry, false);
 });
+
+test('buildCatalogEntry exposes verified PSD metadata through the JSON purchase route', () => {
+  const catalogEntry = buildCatalogEntry(
+    {
+      id: 'curatoria-psd-drive',
+      file: 'curatoria.psd',
+      resource_type: 'binary_asset',
+      mime_type: 'image/vnd.adobe.photoshop',
+      name: 'Curatoria PSD',
+      description: 'Provider-imported PSD proof.',
+      price_usd: '0.01',
+      tags: ['psd', 'proof'],
+      content_sha256: 'a'.repeat(64),
+      content_bytes: 123456,
+      integrity_status: 'verified',
+      delivery_mode: 'entitlement',
+      source_provider: 'gdrive',
+      blob_path: 'sha256/secret-internal-path/curatoria.psd',
+      published_at: '2026-08-29T00:00:00.000Z',
+      active: true,
+    },
+    'https://curatoria.example',
+  );
+
+  assert.equal(
+    catalogEntry.access_url,
+    'https://curatoria.example/assets/curatoria-psd-drive/purchase',
+  );
+  assert.equal(catalogEntry.download_url, undefined);
+  assert.equal(catalogEntry.mime_type, 'image/vnd.adobe.photoshop');
+  assert.equal(catalogEntry.download_filename, 'curatoria.psd');
+  assert.equal(catalogEntry.content_bytes, 123456);
+  assert.equal(catalogEntry.integrity_status, 'verified');
+  assert.equal(catalogEntry.delivery_mode, 'entitlement');
+  assert.equal(catalogEntry.source_provider, 'gdrive');
+  assert.equal('blob_path' in catalogEntry, false);
+});
+
+test('buildCatalogEntry labels unverified integrity without exposing source or Blob path', () => {
+  const catalogEntry = buildCatalogEntry(
+    {
+      id: 'creator-opt-out',
+      file: 'notes.bin',
+      resource_type: 'binary_asset',
+      mime_type: 'application/octet-stream',
+      name: 'Unverified binary',
+      description: 'Creator opted out of a trusted hash commitment.',
+      price_usd: '0.01',
+      tags: ['unverified'],
+      integrity_status: 'unverified',
+      delivery_mode: 'entitlement',
+      source_provider: 'url',
+      blob_path: 'assets/sha256/not-a-public-path/notes.bin',
+      source: { type: 'url', url: 'https://files.example/private/notes.bin' },
+      published_at: '2026-08-29T00:00:00.000Z',
+      active: true,
+    },
+    'https://curatoria.example',
+  );
+
+  assert.equal(catalogEntry.integrity_status, 'unverified');
+  assert.equal(catalogEntry.access_url, 'https://curatoria.example/assets/creator-opt-out/purchase');
+  assert.equal('source' in catalogEntry, false);
+  assert.equal('blob_path' in catalogEntry, false);
+  assert.equal(JSON.stringify(catalogEntry).includes('files.example'), false);
+});

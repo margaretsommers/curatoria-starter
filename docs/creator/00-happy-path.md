@@ -54,6 +54,7 @@ Full details: [Account Preflight](00-accounts-and-env.md#account-preflight).
   - Production path: Google Drive, Dropbox link, or HTTPS URL via publish flags — not required for first local bug-bash
   - Local `design-systems/` stays valid for demo and smoke
   - Detail: [`03-connect-your-storage.md`](03-connect-your-storage.md)
+  - Selling a paid binary asset (PSD, etc.) instead of markdown/zip? It needs Blob storage — locally this is automatic (no account, `.local-blob/`), production needs `BLOB_READ_WRITE_TOKEN`/`BLOB_STORE_ID` and `ENTITLEMENT_SIGNING_KEY`. Detail: [env reference](00-accounts-and-env.md#environment-variables-reference), [`04-products-and-prices.md`](04-products-and-prices.md)
 
 - [ ] **6. Deploy**
   - Connect repo to Vercel (or Railway / Fly / Render)

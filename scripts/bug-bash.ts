@@ -10,7 +10,7 @@
  *
  * Optional env:
  *   BASE_URL=http://localhost:3000
- *   PROD_URL=https://curatoria.dev
+ *   PROD_URL=https://yourdomain.com
  *   STARTER_DIR=../curatoria-starter
  *   AWAL_PAID_TEST=1
  */
@@ -27,7 +27,7 @@ import {
 } from './smoke-checks';
 
 const LOCAL_URL = process.env.BASE_URL ?? 'http://localhost:3000';
-const PROD_URL = process.env.PROD_URL ?? 'https://curatoria.dev';
+const PROD_URL = process.env.PROD_URL ?? 'https://yourdomain.com';
 const ROOT_DIR = path.resolve(__dirname, '..');
 const STARTER_DIR = process.env.STARTER_DIR ?? path.resolve(ROOT_DIR, '../curatoria-starter');
 

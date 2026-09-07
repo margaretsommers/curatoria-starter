@@ -1,97 +1,67 @@
 /**
- * server.ts — Curatoria service entry point
+ * server.ts — composition root for the Curatoria service.
  *
- * Three route groups:
- *
- *   FREE    /.well-known/design-catalog.json  — full catalog (Track A default)
- *           /.well-known/api-catalog           — RFC 9727 linkset discovery
- *           /.well-known/openapi.json          — OpenAPI service description
- *           /.well-known/oauth-authorization-server — RFC 8414 auth discovery
- *           /.well-known/oauth-protected-resource   — RFC 9728 resource metadata
- *           /.well-known/mcp/server-card.json       — MCP Server Card (SEP-1649)
- *           /.well-known/agent-skills/index.json    — Agent Skills Discovery (RFC v0.2.0)
- *           /.well-known/x402                        — x402 commerce discovery manifest
- *           /design-systems                   — catalog list alias (not :id routes)
- *           /catalog                          — same free listing (alias)
- *           /health                           — uptime check
- *
- *   PAID    /design-systems/:id               — markdown bytes after payment
- *           /packs/:id/download               — zip bundle after payment
- *
- *   OPTIONAL (CATALOG_PAYWALL_ENABLED=1) — Track B: teaser at well-known, paid /catalog
- *
- *   ADMIN   POST /admin/publish               — register a new design system
- *           (requires X-Admin-Key header)
+ * createApp is a pure factory. This module loads dotenv, validates env, resolves
+ * the payout wallet, constructs Blob adapters / rate limiters, and caches the
+ * Vercel handler. Facilitator preflight is a diagnostic, not an import
+ * prerequisite. The listener starts only when this file is the process entrypoint.
  */
 
 import dotenv from 'dotenv';
-import express from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
-import path from 'path';
-
+import type express from 'express';
 import { ENV_PATH, PUBLIC_DIR } from './paths';
 
-// Load repo-root .env (npm workspaces run dev from apps/curatoria-service).
 dotenv.config({ path: ENV_PATH });
 
 import {
-  handleFullCatalog,
-  handleFullCatalogDiscovery,
-  handleTeaserDiscovery,
-} from './discovery';
-import { findEntry, appendEntry, readCatalog } from './catalog';
+  appendEntry,
+  findEntry,
+  readCatalog,
+  setActiveCatalogSource,
+} from './catalog';
+import { createBlobCatalogRepository, type BlobCatalogRepository } from './catalog-blob-repository';
 import { resolveResource, storageStatus } from './sources';
 import {
   checkFacilitatorPreflight,
-  isCatalogPaywallEnabled,
   x402CatalogPaywall,
   x402Paywall,
+  x402PurchasePaywall,
 } from './x402';
-import { handleSitemap } from './sitemap';
-import { handleApiCatalog } from './api-catalog';
-import { handleOpenApiSpec } from './openapi-spec';
-import {
-  handleAgentClaimDiscovery,
-  handleAgentRegisterDiscovery,
-  handleAgentRevokeDiscovery,
-  handleAuthMd,
-  handleAuthMethods,
-  handleAuthToken,
-  handleJwks,
-  handleOAuthAuthorizationServer,
-  handleOAuthProtectedResource,
-  respondAdminUnauthorized,
-} from './auth-discovery';
-import { handleHomepage } from './link-headers';
-import { negotiateMarkdownStatic } from './markdown-negotiation';
-import { handleMcpServerCard } from './mcp-server-card';
-import { handleAgentSkillFile, handleAgentSkillsIndex } from './agent-skills-index';
-import { createX402DiscoveryHandler } from './x402-discovery';
-import { PublishRequest, DesignSystemEntry } from './types';
-import { setPaidResourceHeaders } from './delivery';
-
-// ─── Config ───────────────────────────────────────────────────────────────────
+import { AssetDeliveryService } from './asset-delivery';
+import { EntitlementService, keyringFromEnv, storeIndexKeyFromEnv } from './entitlements';
+import { createSignedBlobDownload, putMutableJsonBlob, type BlobSdkAdapter } from './blob-storage';
+import { composeBlobAdapter } from './blob-mode';
+import { createLocalBlobDownloadHandler } from './local-blob-storage';
+import { BlobEntitlementStore } from './blob-entitlement-store';
+import { BlobSettlementJournal } from './settlement-journal';
+import { createApp, type AppConfig, type AppDependencies, type AppLogger } from './app';
+import { createObservabilitySink } from './observability';
+import { InMemoryFixedWindowRateLimiter } from './rate-limit';
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
-const WALLET_ADDRESS = process.env.WALLET_ADDRESS ?? '';
-const WALLET_ENS = process.env.WALLET_ENS ?? '';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY ?? '';
-const NETWORK = process.env.NETWORK ?? 'base-sepolia';
-const FACILITATOR_URL = process.env.FACILITATOR_URL ?? 'https://x402.org/facilitator';
-
-if (!ADMIN_API_KEY) {
-  console.error('ERROR: ADMIN_API_KEY env var is required.');
-  process.exit(1);
-}
+const logger: AppLogger = {
+  info(message) {
+    console.log(message);
+  },
+  warn(message) {
+    console.warn(message);
+  },
+  error(message) {
+    console.error(message);
+  },
+};
 
 function isValidAddress(value: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
 
-async function resolveWalletAddress(): Promise<string> {
-  const fallbackAddress = WALLET_ADDRESS.trim();
-  const ensName = WALLET_ENS.trim();
+function isProductionEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV === 'production';
+}
+
+async function resolveWalletAddress(env: NodeJS.ProcessEnv = process.env): Promise<string> {
+  const fallbackAddress = (env.WALLET_ADDRESS ?? '').trim();
+  const ensName = (env.WALLET_ENS ?? '').trim();
 
   if (fallbackAddress && isValidAddress(fallbackAddress)) {
     return fallbackAddress;
@@ -115,15 +85,15 @@ async function resolveWalletAddress(): Promise<string> {
       const resolvedAddress = await getEnsAddress(ensClient, { name: normalizedName });
 
       if (resolvedAddress && isValidAddress(resolvedAddress)) {
-        console.log(`Resolved WALLET_ENS ${ensName} -> ${resolvedAddress}`);
+        logger.info(`Resolved WALLET_ENS ${ensName} -> ${resolvedAddress}`);
         return resolvedAddress;
       }
 
-      console.warn(
+      logger.warn(
         `WALLET_ENS "${ensName}" did not resolve to an address. Falling back to WALLET_ADDRESS.`,
       );
     } catch (error) {
-      console.warn(
+      logger.warn(
         `Failed to resolve WALLET_ENS "${ensName}" (${String(error)}). Falling back to WALLET_ADDRESS.`,
       );
     }
@@ -134,278 +104,164 @@ async function resolveWalletAddress(): Promise<string> {
   );
 }
 
-// ─── App ──────────────────────────────────────────────────────────────────────
-
-function requireAdmin(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-): void {
-  const key = req.headers['x-admin-key'];
-  if (!key || key !== ADMIN_API_KEY) {
-    respondAdminUnauthorized(req, res);
-    return;
+function composeBinaryDelivery(
+  env: NodeJS.ProcessEnv,
+  production: boolean,
+  clock: () => number,
+  blob: BlobSdkAdapter | undefined,
+): {
+  assetDelivery?: AssetDeliveryService;
+  entitlementStore?: BlobEntitlementStore;
+  settlementJournal?: BlobSettlementJournal;
+  indexKey?: string;
+} {
+  try {
+    const keyring = keyringFromEnv(env);
+    const indexKey = storeIndexKeyFromEnv(env);
+    if (!blob) {
+      throw new Error('Private Blob store is required for paid binary asset delivery.');
+    }
+    const entitlementStore = new BlobEntitlementStore(indexKey, blob);
+    const settlementJournal = new BlobSettlementJournal(indexKey, blob);
+    return {
+      indexKey,
+      entitlementStore,
+      settlementJournal,
+      assetDelivery: new AssetDeliveryService({
+        findEntry,
+        entitlements: new EntitlementService(keyring, entitlementStore, clock),
+        createSignedDownload: pathname => createSignedBlobDownload(pathname, blob, clock()),
+      }),
+    };
+  } catch (error) {
+    if (production) throw error;
+    logger.warn(
+      `Binary asset delivery is disabled until entitlement signing is configured: ${String(error)}`,
+    );
+    return {};
   }
-  next();
 }
 
-/**
- * POST /admin/publish
- *
- * Registers a design.md file from the design-systems/ directory into the
- * registry with a price. The .md file must already exist on disk before
- * calling this endpoint (or use `npm run publish-design` CLI instead).
- *
- * Body: { id, file, name, description, price_usd, tags? }
- * Header: X-Admin-Key: <your ADMIN_API_KEY>
- */
-let appPromise: Promise<express.Express> | undefined;
+async function composeApp(env: NodeJS.ProcessEnv = process.env): Promise<express.Express> {
+  const production = isProductionEnv(env);
+  const adminApiKey = env.ADMIN_API_KEY?.trim() ?? '';
+  if (!adminApiKey) {
+    throw new Error('ADMIN_API_KEY env var is required.');
+  }
 
-async function buildApp(): Promise<express.Express> {
-  const resolvedWalletAddress = await resolveWalletAddress();
-  const facilitatorPreflight = await checkFacilitatorPreflight(FACILITATOR_URL, NETWORK);
-  if (!facilitatorPreflight.ok) {
-    console.error(
-      `WARNING: x402 facilitator preflight failed (${facilitatorPreflight.error ?? 'unknown error'}). Paid routes will return 503 until facilitator config is fixed.`,
+  const resolvedWalletAddress = await resolveWalletAddress(env);
+  const publicOrigin = env.PUBLIC_BASE_URL?.replace(/\/$/, '').trim() || undefined;
+  const clock = () => Date.now();
+  const {
+    mode: blobMode,
+    adapter: blob,
+    localStore: localBlobStore,
+  } = composeBlobAdapter(env, publicOrigin ?? `http://localhost:${PORT}`, clock);
+  if (blobMode === 'local') {
+    logger.info(
+      'Blob mode: local filesystem (.local-blob). No Vercel account is required; set BLOB_READ_WRITE_TOKEN or BLOB_MODE=vercel for private Vercel Blob.',
     );
   }
 
-  const app = express();
-
-  app.set('trust proxy', 1);
-
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", 'https://esm.sh'],
-          connectSrc: ["'self'", 'https://esm.sh', 'https://ruucm.github.io'],
-          workerSrc: ["'self'", 'blob:'],
-          styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
-          fontSrc: ["'self'", 'https:', 'data:'],
-          imgSrc: ["'self'", 'data:'],
-          objectSrc: ["'none'"],
-          baseUri: ["'self'"],
-          formAction: ["'self'"],
-          frameAncestors: ["'self'"],
-          upgradeInsecureRequests: [],
-        },
-      },
-    }),
-  );
-  app.use(
-    cors({
-      exposedHeaders: [
-        'PAYMENT-REQUIRED',
-        'PAYMENT-RESPONSE',
-        'X-PAYMENT-REQUIRED',
-        'X-PAYMENT-RESPONSE',
-        'Content-Disposition',
-        'Content-Length',
-        'Content-Type',
-        'X-Design-System-Id',
-        'X-Design-System-Name',
-        'X-Design-System-Version',
-        'X-Storage-Source',
-        'X-Content-Sha256',
-      ],
-    }),
-  );
-  app.use(express.json());
-  app.get('/', handleHomepage);
-  app.get('/index.html', handleHomepage);
-  app.get('/auth.md', handleAuthMd);
-  app.get('/sitemap.xml', handleSitemap);
-  app.get('/.well-known/api-catalog', handleApiCatalog);
-  app.get('/.well-known/openapi.json', handleOpenApiSpec);
-  app.get('/.well-known/oauth-authorization-server', handleOAuthAuthorizationServer);
-  app.get('/.well-known/oauth-protected-resource', handleOAuthProtectedResource);
-  app.get('/.well-known/auth', handleAuthMethods);
-  app.post('/.well-known/auth/token', handleAuthToken);
-  app.get('/.well-known/jwks.json', handleJwks);
-  app.get('/.well-known/agent/register', handleAgentRegisterDiscovery);
-  app.get('/.well-known/agent/claim', handleAgentClaimDiscovery);
-  app.get('/.well-known/agent/revoke', handleAgentRevokeDiscovery);
-  app.get('/.well-known/mcp/server-card.json', handleMcpServerCard);
-  app.get('/.well-known/agent-skills/index.json', handleAgentSkillsIndex);
-  app.get('/.well-known/agent-skills/:name/SKILL.md', handleAgentSkillFile);
-  app.get(
-    '/.well-known/x402',
-    createX402DiscoveryHandler({
-      facilitatorUrl: FACILITATOR_URL,
-      network: NETWORK,
-      walletAddress: resolvedWalletAddress,
-    }),
-  );
-  app.get(
-    '/.well-known/x402.json',
-    createX402DiscoveryHandler({
-      facilitatorUrl: FACILITATOR_URL,
-      network: NETWORK,
-      walletAddress: resolvedWalletAddress,
-    }),
-  );
-  app.use(negotiateMarkdownStatic);
-  app.use(express.static(PUBLIC_DIR));
-
-  // ─── Free: Catalog discovery (Track A default) ─────────────────────────────
-
-  if (isCatalogPaywallEnabled()) {
-    app.get('/.well-known/design-catalog.json', handleTeaserDiscovery);
-    app.get('/design-systems', handleTeaserDiscovery);
-    app.get(
-      '/catalog',
-      x402CatalogPaywall({
-        walletAddress: resolvedWalletAddress,
-        network: NETWORK,
-        facilitatorUrl: FACILITATOR_URL,
-      }),
-      handleFullCatalog,
-    );
-  } else {
-    app.get('/.well-known/design-catalog.json', handleFullCatalogDiscovery);
-    app.get('/design-systems', handleFullCatalogDiscovery);
-    app.get('/catalog', handleFullCatalogDiscovery);
+  if (production) {
+    if (!publicOrigin) {
+      throw new Error('PUBLIC_BASE_URL is required in production for entitlement issuer/origin.');
+    }
+    if (!blob) {
+      throw new Error('BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN is required in production.');
+    }
+    storeIndexKeyFromEnv(env);
+    keyringFromEnv(env);
   }
 
-  app.get('/health', (_req, res) => {
-    res.json({
-      status: 'ok',
-      network: NETWORK,
-      wallet: resolvedWalletAddress,
-      storage: storageStatus(),
-    });
-  });
+  const binary = composeBinaryDelivery(env, production, clock, blob);
 
-  app.get('/admin/facilitator-preflight', requireAdmin, async (_req, res) => {
-    const result = await checkFacilitatorPreflight(FACILITATOR_URL, NETWORK);
-    res.status(result.ok ? 200 : 502).json(result);
-  });
+  // design-systems/.registry.json (read via the filesystem in ./catalog) is
+  // confirmed absent from Vercel's deployed function bundle for this project
+  // -- every request crashed at module load before this fix. In production,
+  // the whole catalog lives in Blob instead (see catalog-blob-repository.ts);
+  // local/dev/test keep the existing, unchanged filesystem catalog.
+  let blobCatalog: BlobCatalogRepository | undefined;
+  if (production) {
+    if (!blob) throw new Error('BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN is required in production.');
+    blobCatalog = createBlobCatalogRepository(blob, putMutableJsonBlob);
+    await blobCatalog.initialize();
+    // x402.ts, x402-discovery.ts, discovery.ts, openapi-spec.ts, and sitemap.ts
+    // all call readCatalog/findEntry/listActive imported directly from
+    // ./catalog rather than through the dependencies.catalog DI below --
+    // install the Blob-backed repository as catalog.ts's own active source so
+    // every one of those call sites gets Blob data too, without threading DI
+    // through each of them individually. See catalog.ts's own comment above
+    // readCatalog() for the full rationale.
+    setActiveCatalogSource(blobCatalog);
+  }
 
-  // ─── Paid: Design System Content ───────────────────────────────────────────
-
-  // x402Paywall middleware intercepts every GET /design-systems/:id request:
-  //   - No PAYMENT-SIGNATURE header → returns HTTP 402 with PAYMENT-REQUIRED
-  //   - Valid PAYMENT-SIGNATURE header → verifies + settles, then falls through
-  app.get(
-    '/design-systems/:id',
-    x402Paywall({
-      walletAddress: resolvedWalletAddress,
-      network: NETWORK,
-      facilitatorUrl: FACILITATOR_URL,
-      expectedResourceType: 'design_md',
-    }),
-    async (req, res) => {
-      const entry = findEntry(req.params.id);
-      if (!entry) {
-        // Shouldn't happen (middleware 404s first) but guards the type
-        res.status(404).json({ error: 'Design system not found' });
-        return;
-      }
-
-      let resolved;
-      try {
-        resolved = await resolveResource(entry);
-      } catch (err) {
-        // The buyer already paid; surface a server error but never leak the
-        // underlying source URL or credentials.
-        console.error(`Source resolution failed for "${entry.id}": ${String(err)}`);
-        res.status(502).json({ error: 'Could not retrieve product from its storage source' });
-        return;
-      }
-
-      setPaidResourceHeaders(res, resolved, {
-        id: entry.id,
-        name: entry.name,
-        contentSha256: entry.content_sha256,
-      }).send(resolved.buffer);
+  const config: AppConfig = {
+    walletAddress: resolvedWalletAddress,
+    network: env.NETWORK ?? 'base-sepolia',
+    facilitatorUrl: env.FACILITATOR_URL ?? 'https://x402.org/facilitator',
+    adminApiKey,
+    allowedOrigins: (env.BROWSER_ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean),
+    catalogPaywallEnabled: env.CATALOG_PAYWALL_ENABLED === '1',
+    production,
+    publicDir: PUBLIC_DIR,
+    publicOrigin,
+    entitlementStoreIndexKey: binary.indexKey,
+  };
+  const dependencies: AppDependencies = {
+    catalog: blobCatalog ?? {
+      findEntry,
+      readCatalog,
+      appendEntry,
+      resolveResource,
     },
-  );
-
-  app.get(
-    '/packs/:id/download',
-    x402Paywall({
-      walletAddress: resolvedWalletAddress,
-      network: NETWORK,
-      facilitatorUrl: FACILITATOR_URL,
-      expectedResourceType: 'bundle_zip',
-    }),
-    async (req, res) => {
-      const entry = findEntry(req.params.id);
-      if (!entry) {
-        res.status(404).json({ error: 'Bundle not found' });
-        return;
-      }
-
-      let resolved;
-      try {
-        resolved = await resolveResource(entry);
-      } catch (err) {
-        console.error(`Source resolution failed for "${entry.id}": ${String(err)}`);
-        res.status(502).json({ error: 'Could not retrieve bundle from its storage source' });
-        return;
-      }
-
-      setPaidResourceHeaders(res, resolved, {
-        id: entry.id,
-        name: entry.name,
-        contentSha256: entry.content_sha256,
-      }).send(resolved.buffer);
+    assetDelivery: binary.assetDelivery,
+    x402: {
+      paywall: x402Paywall,
+      purchasePaywall: config =>
+        x402PurchasePaywall({
+          ...config,
+          settlementJournal: binary.settlementJournal,
+          entitlementStore: binary.entitlementStore,
+        }),
+      catalogPaywall: x402CatalogPaywall,
     },
-  );
+    facilitatorDiagnostic: checkFacilitatorPreflight,
+    blob,
+    localBlobDownloads: localBlobStore
+      ? createLocalBlobDownloadHandler(localBlobStore)
+      : undefined,
+    entitlementStore: binary.entitlementStore,
+    rateLimiter: new InMemoryFixedWindowRateLimiter(),
+    clock,
+    logger,
+    storageStatus,
+    observe: createObservabilitySink(line => logger.info(line)),
+  };
 
-  // ─── Admin: Publish a New Design System ────────────────────────────────────
-
-  app.post('/admin/publish', requireAdmin, (req, res) => {
-    const body = req.body as Partial<PublishRequest>;
-
-    if (!body.id || !body.file || !body.name || !body.price_usd) {
-      res.status(400).json({
-        error: 'Missing required fields',
-        required: ['id', 'file', 'name', 'price_usd'],
-      });
-      return;
+  const app = createApp(config, dependencies);
+  void checkFacilitatorPreflight(config.facilitatorUrl, config.network).then(preflight => {
+    if (!preflight.ok) {
+      logger.error(
+        `WARNING: x402 facilitator preflight failed (${preflight.error ?? 'unknown error'}). Paid routes will return 503 until facilitator config is fixed.`,
+      );
     }
-
-    if (!/^[a-z0-9-]+$/.test(body.id)) {
-      res.status(400).json({ error: 'id must be lowercase alphanumeric with hyphens only' });
-      return;
-    }
-
-    const entry: DesignSystemEntry = {
-      id: body.id,
-      file: body.file,
-      resource_type: 'design_md',
-      mime_type: 'text/markdown',
-      name: body.name,
-      description: body.description ?? '',
-      price_usd: body.price_usd,
-      tags: body.tags ?? [],
-      published_at: new Date().toISOString(),
-      active: true,
-    };
-
-    appendEntry(entry);
-
-    res.json({
-      success: true,
-      entry,
-      access_url: `${req.protocol}://${req.get('host')}/design-systems/${entry.id}`,
-    });
   });
-
   return app;
 }
 
-async function getApp(): Promise<express.Express> {
+let appPromise: Promise<express.Express> | undefined;
+
+export async function getApp(): Promise<express.Express> {
   if (!appPromise) {
-    appPromise = buildApp();
+    appPromise = composeApp();
   }
   return appPromise;
 }
 
-// Vercel runs each request through this handler instead of a long-lived listener.
 export default async function vercelHandler(
   req: express.Request,
   res: express.Response,
@@ -416,6 +272,7 @@ export default async function vercelHandler(
 
 async function startLocalServer(): Promise<void> {
   const app = await getApp();
+  const network = process.env.NETWORK ?? 'base-sepolia';
 
   app.listen(PORT, () => {
     const catalog = readCatalog();
@@ -425,18 +282,21 @@ async function startLocalServer(): Promise<void> {
     console.log('  Curatoria Service');
     console.log('  ─────────────────────────────────────────────');
     console.log(`  URL:      http://localhost:${PORT}`);
-    console.log(`  Network:  ${NETWORK}`);
+    console.log(`  Network:  ${network}`);
     console.log(`  Designs:  ${active.length} published`);
     console.log('');
-    const catalogMode = isCatalogPaywallEnabled() ? 'Track B (teaser + paid /catalog)' : 'Track A (free full catalog)';
+    const catalogMode =
+      process.env.CATALOG_PAYWALL_ENABLED === '1'
+        ? 'Track B (teaser + paid /catalog)'
+        : 'Track A (free full catalog)';
     console.log(`  Catalog:   ${catalogMode}`);
     console.log(`  Discovery: http://localhost:${PORT}/.well-known/design-catalog.json`);
     console.log('');
   });
 }
 
-if (!process.env.VERCEL) {
-  startLocalServer().catch((error) => {
+if (require.main === module) {
+  startLocalServer().catch(error => {
     console.error(`ERROR: ${String(error)}`);
     process.exit(1);
   });
