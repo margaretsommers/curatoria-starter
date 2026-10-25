@@ -19,7 +19,12 @@ import {
   readCatalog,
   setActiveCatalogSource,
 } from './catalog';
-import { createBlobCatalogRepository, type BlobCatalogRepository } from './catalog-blob-repository';
+import {
+  createBlobCatalogRepository,
+  type BlobCatalogRepository,
+} from './catalog-blob-repository';
+import { readBundledCatalogSnapshot } from './catalog-snapshot';
+import { createCommerceReadinessController } from './commerce-readiness';
 import { resolveResource, storageStatus } from './sources';
 import {
   checkFacilitatorPreflight,
@@ -34,11 +39,18 @@ import { composeBlobAdapter } from './blob-mode';
 import { createLocalBlobDownloadHandler } from './local-blob-storage';
 import { BlobEntitlementStore } from './blob-entitlement-store';
 import { BlobSettlementJournal } from './settlement-journal';
-import { createApp, type AppConfig, type AppDependencies, type AppLogger } from './app';
+import {
+  createApp,
+  type AppConfig,
+  type AppDependencies,
+  type AppLogger,
+  type ServiceReadiness,
+} from './app';
 import { createObservabilitySink } from './observability';
 import { InMemoryFixedWindowRateLimiter } from './rate-limit';
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
+const COMMERCE_READINESS_MARKER_PATH = 'health/v1/commerce-write-readiness.json';
 const logger: AppLogger = {
   info(message) {
     console.log(message);
@@ -57,6 +69,40 @@ function isValidAddress(value: string): boolean {
 
 function isProductionEnv(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.NODE_ENV === 'production';
+}
+
+export function resolvePublicOrigin(
+  env: NodeJS.ProcessEnv,
+  production: boolean = isProductionEnv(env),
+): string | undefined {
+  const configured = env.PUBLIC_BASE_URL?.replace(/\/$/, '').trim();
+  if (configured) return configured;
+
+  if (env.VERCEL_ENV === 'preview') {
+    const hostname = env.VERCEL_URL?.trim() ?? '';
+    const validHostname =
+      hostname.length <= 253 &&
+      hostname.endsWith('.vercel.app') &&
+      hostname.split('.').every(
+        label =>
+          label.length >= 1 &&
+          label.length <= 63 &&
+          /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label),
+      );
+    if (!validHostname) {
+      throw new Error(
+        'A valid VERCEL_URL hostname ending in .vercel.app is required for Vercel Preview when PUBLIC_BASE_URL is absent.',
+      );
+    }
+    return `https://${hostname.toLowerCase()}`;
+  }
+
+  if (production) {
+    throw new Error(
+      'PUBLIC_BASE_URL is required in production outside Vercel Preview for entitlement issuer/origin.',
+    );
+  }
+  return undefined;
 }
 
 async function resolveWalletAddress(env: NodeJS.ProcessEnv = process.env): Promise<string> {
@@ -150,7 +196,7 @@ async function composeApp(env: NodeJS.ProcessEnv = process.env): Promise<express
   }
 
   const resolvedWalletAddress = await resolveWalletAddress(env);
-  const publicOrigin = env.PUBLIC_BASE_URL?.replace(/\/$/, '').trim() || undefined;
+  const publicOrigin = resolvePublicOrigin(env, production);
   const clock = () => Date.now();
   const {
     mode: blobMode,
@@ -164,9 +210,6 @@ async function composeApp(env: NodeJS.ProcessEnv = process.env): Promise<express
   }
 
   if (production) {
-    if (!publicOrigin) {
-      throw new Error('PUBLIC_BASE_URL is required in production for entitlement issuer/origin.');
-    }
     if (!blob) {
       throw new Error('BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN is required in production.');
     }
@@ -184,8 +227,16 @@ async function composeApp(env: NodeJS.ProcessEnv = process.env): Promise<express
   let blobCatalog: BlobCatalogRepository | undefined;
   if (production) {
     if (!blob) throw new Error('BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN is required in production.');
-    blobCatalog = createBlobCatalogRepository(blob, putMutableJsonBlob);
+    blobCatalog = createBlobCatalogRepository(blob, putMutableJsonBlob, {
+      snapshot: readBundledCatalogSnapshot(),
+    });
     await blobCatalog.initialize();
+    const catalogStatus = blobCatalog.status();
+    if (!catalogStatus.authoritative) {
+      logger.error(
+        `Blob catalog is unavailable; serving the bundled read-only snapshot: ${catalogStatus.error ?? 'unknown storage error'}`,
+      );
+    }
     // x402.ts, x402-discovery.ts, discovery.ts, openapi-spec.ts, and sitemap.ts
     // all call readCatalog/findEntry/listActive imported directly from
     // ./catalog rather than through the dependencies.catalog DI below --
@@ -195,6 +246,66 @@ async function composeApp(env: NodeJS.ProcessEnv = process.env): Promise<express
     // readCatalog() for the full rationale.
     setActiveCatalogSource(blobCatalog);
   }
+
+  const commerceReadiness = production && blob && blobCatalog
+    ? createCommerceReadinessController({
+        clock,
+        catalogAuthoritative: () => Boolean(blobCatalog?.status().authoritative),
+        verifyAssetReadable: async pathname => {
+          await blob.head(pathname);
+        },
+        verifyWriteCapability: async () => {
+          await putMutableJsonBlob(
+            COMMERCE_READINESS_MARKER_PATH,
+            Buffer.from(
+              `${JSON.stringify({
+                version: 1,
+                verified_at: new Date(clock()).toISOString(),
+              })}\n`,
+            ),
+          );
+        },
+        logError: message => logger.error(message),
+      })
+    : undefined;
+
+  const readiness = (): ServiceReadiness => {
+    const catalogStatus = blobCatalog?.status();
+    return {
+      public_site: { ready: true },
+      catalog: catalogStatus
+        ? {
+            ready: catalogStatus.initialized,
+            source: catalogStatus.source,
+            authoritative: catalogStatus.authoritative,
+            ...(catalogStatus.error
+              ? { detail: 'Authoritative catalog storage is unavailable.' }
+              : {}),
+          }
+        : { ready: true, source: 'filesystem', authoritative: true },
+      commerce: commerceReadiness?.status() ?? {
+        ready: !production,
+        storage: production ? 'unavailable' : 'unknown',
+        ...(production
+          ? { detail: 'Authoritative storage write capability has not been verified.' }
+          : {}),
+      },
+    };
+  };
+
+  const commercePreflight = commerceReadiness && blobCatalog
+    ? async (productId?: string) => {
+        const entry = productId ? blobCatalog.findEntry(productId) : undefined;
+        if (productId && !entry) return { ready: true as const };
+        if (entry?.resource_type === 'binary_asset' && !entry.blob_path) {
+          return {
+            ready: false as const,
+            reason: 'The paid asset has no authoritative immutable storage object.',
+          };
+        }
+        return commerceReadiness.check(entry?.resource_type === 'binary_asset' ? entry.blob_path : undefined);
+      }
+    : undefined;
 
   const config: AppConfig = {
     walletAddress: resolvedWalletAddress,
@@ -239,6 +350,8 @@ async function composeApp(env: NodeJS.ProcessEnv = process.env): Promise<express
     clock,
     logger,
     storageStatus,
+    readiness,
+    commercePreflight,
     observe: createObservabilitySink(line => logger.info(line)),
   };
 

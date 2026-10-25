@@ -17,7 +17,10 @@ import type { FacilitatorConfig } from '@x402/core/server';
 import type { Network } from '@x402/core/types';
 import { ExpressAdapter, paymentMiddlewareFromHTTPServer } from '@x402/express';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
-import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
+import {
+  bazaarResourceServerExtension,
+  declareDiscoveryExtension,
+} from '@x402/extensions/bazaar';
 import { findEntry, resolveCatalogPriceUsd } from './catalog';
 import {
   authorizedPaymentIdentity,
@@ -507,7 +510,7 @@ function catalogEntryForRequest(req: Request, expectedResourceType: ResourceType
   return entry && entryResourceType === expectedResourceType ? entry : undefined;
 }
 
-function buildHttpResourceServer(
+export function buildHttpResourceServer(
   config: X402Config,
   resource: ProtectedResource,
 ): x402HTTPResourceServer {
@@ -528,7 +531,9 @@ function buildHttpResourceServer(
       },
     };
   });
-  const server = new x402ResourceServer(facilitatorClient).register(caipNetwork, evmScheme);
+  const server = new x402ResourceServer(facilitatorClient)
+    .register(caipNetwork, evmScheme)
+    .registerExtension(bazaarResourceServerExtension);
   const routes = {
     [resource.routePattern]: {
       accepts: {
@@ -542,6 +547,36 @@ function buildHttpResourceServer(
       mimeType: resource.mimeType,
       serviceName: 'Curatoria',
       tags: ['curatoria', 'design-systems', resource.resourceType],
+      extensions: {
+        ...declareDiscoveryExtension({
+          input: { id: '<catalog-slug>' },
+          inputSchema: {
+            type: 'object',
+            properties: {
+              id: {
+                type: 'string',
+                description: 'Catalog slug for the paid Curatoria resource.',
+              },
+            },
+            required: ['id'],
+          },
+          output: {
+            example: {
+              entitlement: '<short-lived-signed-token>',
+              redeem_url: '/assets/<id>/redeem',
+              expires_at: '<ISO-8601>',
+            },
+            schema: {
+              type: 'object',
+              description: 'Short-lived entitlement returned after successful x402 settlement.',
+            },
+          },
+        }),
+        curatoria: {
+          resourceType: resource.resourceType,
+          routePattern: resource.routePattern,
+        },
+      },
     },
   } as RoutesConfig;
   return new x402HTTPResourceServer(server, routes);

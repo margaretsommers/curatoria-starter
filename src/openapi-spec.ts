@@ -262,6 +262,16 @@ export function buildOpenApiDocument(baseUrl: string): Record<string, unknown> {
                       status: { type: 'string' },
                       network: { type: 'string' },
                       wallet: { type: 'string' },
+                      readiness: {
+                        type: 'object',
+                        description:
+                          'Independent public-site, catalog-source, and commerce-storage readiness.',
+                        properties: {
+                          public_site: { type: 'object' },
+                          catalog: { type: 'object' },
+                          commerce: { type: 'object' },
+                        },
+                      },
                     },
                   },
                 },

@@ -33,9 +33,11 @@ function mockSdk(initial?: DesignCatalog): {
   sdk: BlobSdkAdapter;
   writeMutableJson: MutableJsonBlobWriter;
   writes: DesignCatalog[];
+  readCalls(): number;
   currentStored(): DesignCatalog | undefined;
 } {
   let stored = initial ? Buffer.from(JSON.stringify(initial)) : undefined;
+  let reads = 0;
   const writes: DesignCatalog[] = [];
   const sdk: BlobSdkAdapter = {
     async put() {
@@ -45,6 +47,7 @@ function mockSdk(initial?: DesignCatalog): {
       throw new Error('not used');
     },
     async read(pathname) {
+      reads += 1;
       if (pathname !== REGISTRY_PATHNAME || !stored) {
         throw Object.assign(new Error('not found'), { statusCode: 404, code: 'BLOB_NOT_FOUND' });
       }
@@ -68,15 +71,28 @@ function mockSdk(initial?: DesignCatalog): {
     stored = Buffer.from(body);
     writes.push(JSON.parse(Buffer.from(body).toString('utf8')));
   };
-  return { sdk, writeMutableJson, writes, currentStored: () => (stored ? JSON.parse(stored.toString('utf8')) : undefined) };
+  return {
+    sdk,
+    writeMutableJson,
+    writes,
+    readCalls: () => reads,
+    currentStored: () => (stored ? JSON.parse(stored.toString('utf8')) : undefined),
+  };
 }
 
-test('initialize seeds an empty catalog when no registry blob exists yet', async () => {
+test('initialize uses the bundled snapshot when no registry blob exists', async () => {
   const { sdk, writeMutableJson } = mockSdk();
-  const repo = createBlobCatalogRepository(sdk, writeMutableJson);
+  const snapshot = catalog([entry({ id: 'snapshot-entry' })]);
+  const repo = createBlobCatalogRepository(sdk, writeMutableJson, { snapshot });
   await repo.initialize();
-  assert.deepEqual(repo.readCatalog().design_systems, []);
-  assert.equal(repo.findEntry('anything'), null);
+  assert.deepEqual(repo.readCatalog(), snapshot);
+  assert.equal(repo.findEntry('snapshot-entry')?.id, 'snapshot-entry');
+  assert.deepEqual(repo.status(), {
+    initialized: true,
+    source: 'snapshot',
+    authoritative: false,
+    error: 'Blob-backed catalog registry was not found.',
+  });
 });
 
 test('initialize loads an existing registry blob and readCatalog/findEntry serve from it', async () => {
@@ -85,6 +101,8 @@ test('initialize loads an existing registry blob and readCatalog/findEntry serve
   const repo = createBlobCatalogRepository(sdk, writeMutableJson);
   await repo.initialize();
   assert.deepEqual(repo.readCatalog(), seeded);
+  assert.equal(repo.status().source, 'blob');
+  assert.equal(repo.status().authoritative, true);
   assert.equal(repo.findEntry('curatoria-demo-md')?.id, 'curatoria-demo-md');
   assert.equal(repo.findEntry('missing'), null);
 });
@@ -151,23 +169,30 @@ test('appendEntry rejects unsafe filenames the same way the filesystem catalog d
   );
 });
 
-test('a stale cache is served immediately while a background refresh runs, and refreshed content appears afterward', async () => {
-  const { sdk, writeMutableJson, currentStored } = mockSdk(catalog([entry({ id: 'first' })]));
-  const repo = createBlobCatalogRepository(sdk, writeMutableJson, { refreshTtlMs: 0 });
+test('catalog reads never poll Blob after initialization', async () => {
+  const { sdk, writeMutableJson, readCalls } = mockSdk(catalog([entry({ id: 'first' })]));
+  const repo = createBlobCatalogRepository(sdk, writeMutableJson);
   await repo.initialize();
-
-  // Simulate another warm instance publishing, bypassing this instance's cache.
-  await writeMutableJson('registry/v1/catalog.json', Buffer.from(JSON.stringify(catalog([
-    entry({ id: 'first' }),
-    entry({ id: 'second' }),
-  ]))));
-  assert.equal(currentStored()?.design_systems.length, 2);
-
-  const immediate = repo.readCatalog();
-  assert.equal(immediate.design_systems.length, 1, 'stale-while-revalidate serves the old cache on this call');
-
+  assert.equal(readCalls(), 1);
+  for (let index = 0; index < 100; index += 1) {
+    repo.readCatalog();
+    repo.findEntry('first');
+  }
   await new Promise(resolve => setTimeout(resolve, 20));
-  assert.equal(repo.findEntry('second')?.id, 'second', 'background refresh eventually picks up the other instance\'s write');
+  assert.equal(readCalls(), 1);
+});
+
+test('Blob quota 403 falls back to the snapshot instead of an empty catalog', async () => {
+  const { sdk, writeMutableJson } = mockSdk();
+  sdk.read = async () => {
+    throw Object.assign(new Error('Blob store suspended: quota exceeded'), { statusCode: 403 });
+  };
+  const snapshot = catalog([entry({ id: 'last-known-good' })]);
+  const repo = createBlobCatalogRepository(sdk, writeMutableJson, { snapshot });
+  await repo.initialize();
+  assert.equal(repo.findEntry('last-known-good')?.id, 'last-known-good');
+  assert.equal(repo.status().source, 'snapshot');
+  assert.equal(repo.status().authoritative, false);
 });
 
 test('appendEntry surfaces the underlying error when the registry write fails', async () => {

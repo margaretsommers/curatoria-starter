@@ -147,10 +147,6 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   };
 }
 
-function passthrough(): (req: Request, res: Response, next: NextFunction) => void {
-  return (_req, _res, next) => next();
-}
-
 function settleThenPass(calls?: { x402: number }): (req: Request, res: Response, next: NextFunction) => void {
   return (_req, res, next) => {
     if (calls) calls.x402 += 1;
@@ -165,8 +161,11 @@ function binaryDeps(
     logger?: AppLogger;
     rateLimiter?: InMemoryFixedWindowRateLimiter;
     x402Calls?: { x402: number };
+    directPaywallCalls?: { count: number };
+    catalogPaywallCalls?: { count: number };
     storeFinds?: { count: number };
     events?: ObservabilityEvent[];
+    commercePreflight?: AppDependencies['commercePreflight'];
   } = {},
 ): AppDependencies {
   const sdk = durableSdk(objects);
@@ -202,9 +201,15 @@ function binaryDeps(
     },
     assetDelivery: delivery,
     x402: {
-      paywall: () => passthrough(),
+      paywall: () => (_req, _res, next) => {
+        if (options.directPaywallCalls) options.directPaywallCalls.count += 1;
+        next();
+      },
       purchasePaywall: () => settleThenPass(options.x402Calls),
-      catalogPaywall: () => passthrough(),
+      catalogPaywall: () => (_req, _res, next) => {
+        if (options.catalogPaywallCalls) options.catalogPaywallCalls.count += 1;
+        next();
+      },
     },
     facilitatorDiagnostic: async () => {
       throw new Error('live facilitator diagnostic');
@@ -220,6 +225,7 @@ function binaryDeps(
       google_drive: { enabled: true, api_key: false },
       dropbox: { enabled: true, oauth: false },
     }),
+    commercePreflight: options.commercePreflight,
     observe: options.events
       ? createObservabilitySink(line => {
           options.events!.push(JSON.parse(line) as ObservabilityEvent);
@@ -378,6 +384,142 @@ test('missing binary deps disable only binary routes in local mode', async () =>
     assert.equal(redeem.status, 503);
     assert.equal(health.status, 200);
     assert.equal((health.json as { status: string }).status, 'ok');
+  });
+});
+
+test('commerce storage failure returns 503 before payment settlement', async () => {
+  const calls = { x402: 0 };
+  const app = createApp(
+    baseConfig(),
+    binaryDeps(undefined, {
+      x402Calls: calls,
+      commercePreflight: async () => ({
+        ready: false,
+        reason: 'Authoritative storage could not establish download readiness.',
+      }),
+    }),
+  );
+  await withServer(app, async url => {
+    const purchase = await request(url, {
+      path: `/assets/${productId}/purchase`,
+      headers: { 'payment-signature': paymentSignature() },
+    });
+    assert.equal(purchase.status, 503);
+    assert.equal(calls.x402, 0, 'the settlement middleware must not run');
+    assert.match(
+      (purchase.json as { error: string }).error,
+      /storage is temporarily unavailable/i,
+    );
+  });
+});
+
+test('every paid route refuses settlement when commerce storage is unavailable', async () => {
+  const direct = { count: 0 };
+  const catalog = { count: 0 };
+  const purchase = { x402: 0 };
+  const deps = binaryDeps(undefined, {
+    directPaywallCalls: direct,
+    catalogPaywallCalls: catalog,
+    x402Calls: purchase,
+    commercePreflight: async () => ({
+      ready: false,
+      reason: 'Authoritative storage write capability is unavailable.',
+    }),
+  });
+  const app = createApp(baseConfig({ catalogPaywallEnabled: true }), deps);
+  await withServer(app, async url => {
+    const attempted = { 'payment-signature': paymentSignature() };
+    const responses = await Promise.all([
+      request(url, { path: '/design-systems/example', headers: attempted }),
+      request(url, { path: '/packs/example/download', headers: attempted }),
+      request(url, { path: '/catalog', headers: attempted }),
+      request(url, { path: `/assets/${productId}/purchase`, headers: attempted }),
+    ]);
+    assert.deepEqual(responses.map(response => response.status), [503, 503, 503, 503]);
+    assert.equal(direct.count, 0);
+    assert.equal(catalog.count, 0);
+    assert.equal(purchase.x402, 0);
+  });
+});
+
+test('unpaid challenges do not probe commerce storage', async () => {
+  let preflights = 0;
+  const direct = { count: 0 };
+  const deps = binaryDeps(undefined, {
+    directPaywallCalls: direct,
+    commercePreflight: async () => {
+      preflights += 1;
+      return { ready: false, reason: 'unavailable' };
+    },
+  });
+  const app = createApp(baseConfig(), deps);
+  await withServer(app, async url => {
+    await request(url, { path: '/design-systems/example' });
+    assert.equal(preflights, 0);
+    assert.equal(direct.count, 1);
+  });
+});
+
+test('production runtime publication is disabled before catalog mutation', async () => {
+  let appends = 0;
+  const deps = binaryDeps();
+  deps.catalog.appendEntry = async () => {
+    appends += 1;
+  };
+  const app = createApp(baseConfig({ production: true }), deps);
+  await withServer(app, async url => {
+    const response = await request(url, {
+      method: 'POST',
+      path: '/admin/publish',
+      headers: { 'x-admin-key': 'admin-test-key' },
+      body: {
+        id: 'runtime-product',
+        file: 'runtime.md',
+        name: 'Runtime Product',
+        price_usd: '0.01',
+      },
+    });
+    assert.equal(response.status, 409);
+    assert.match(
+      (response.json as { error: string }).error,
+      /runtime publication is disabled/i,
+    );
+    assert.equal(appends, 0);
+  });
+});
+
+test('health distinguishes public, snapshot catalog, and unavailable commerce', async () => {
+  const deps = binaryDeps();
+  deps.readiness = () => ({
+    public_site: { ready: true },
+    catalog: {
+      ready: true,
+      source: 'snapshot',
+      authoritative: false,
+      detail: 'Authoritative catalog storage is unavailable.',
+    },
+    commerce: {
+      ready: false,
+      storage: 'unavailable',
+      detail: 'Settlement is disabled.',
+    },
+  });
+  const app = createApp(baseConfig(), deps);
+  await withServer(app, async url => {
+    const health = await request(url, { path: '/health' });
+    assert.equal(health.status, 200);
+    const body = health.json as {
+      status: string;
+      readiness: {
+        public_site: { ready: boolean };
+        catalog: { source: string };
+        commerce: { ready: boolean };
+      };
+    };
+    assert.equal(body.status, 'ok');
+    assert.equal(body.readiness.public_site.ready, true);
+    assert.equal(body.readiness.catalog.source, 'snapshot');
+    assert.equal(body.readiness.commerce.ready, false);
   });
 });
 

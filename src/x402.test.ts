@@ -13,6 +13,7 @@ import {
 import { InMemorySettlementJournal } from './settlement-journal';
 import type { DesignSystemEntry } from './types';
 import {
+  buildHttpResourceServer,
   createSettlementFirstMiddleware,
   X402_SETTLEMENT_LOCAL,
 } from './x402';
@@ -240,6 +241,38 @@ test('installed facilitator still has no settlement-status lookup', () => {
 
   const resourceServerSource = fs.readFileSync(require.resolve('@x402/core/server'), 'utf8');
   assert.match(resourceServerSource, /warnResourceServerHookFailure\("afterSettle"/);
+});
+
+test('settlement-first binary server declares and registers Bazaar discovery metadata', () => {
+  const server = buildHttpResourceServer(
+    {
+      walletAddress: '0x1111111111111111111111111111111111111111',
+      network: 'base-sepolia',
+      facilitatorUrl: 'https://x402.org/facilitator',
+    },
+    {
+      routePattern: 'GET /assets/:id/purchase',
+      description: 'Curatoria paid binary asset entitlement',
+      mimeType: 'application/json',
+      resourceType: 'binary_asset',
+    },
+  );
+  const routes = server.routes as Record<
+    string,
+    { extensions?: Record<string, unknown> }
+  >;
+  const route = routes['GET /assets/:id/purchase'];
+
+  assert.equal(server.server.hasExtension('bazaar'), true);
+  assert.ok(route.extensions?.bazaar);
+  assert.deepEqual(
+    (route.extensions?.bazaar as { info?: { output?: { example?: unknown } } }).info?.output?.example,
+    {
+      entitlement: '<short-lived-signed-token>',
+      redeem_url: '/assets/<id>/redeem',
+      expires_at: '<ISO-8601>',
+    },
+  );
 });
 
 test('crash between settle and entitlement save retries without a second settlement', async () => {

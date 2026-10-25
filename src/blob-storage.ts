@@ -54,7 +54,7 @@ export interface BlobSdkAdapter {
     contentType?: string;
     etag: string;
   }>;
-  read(pathname: string): Promise<{
+  read(pathname: string, options?: { useCache?: boolean }): Promise<{
     body: Readable;
     pathname: string;
     size: number;
@@ -98,8 +98,11 @@ export const vercelBlobSdk: BlobSdkAdapter = {
       etag: details.etag,
     };
   },
-  async read(pathname) {
-    const result = await get(pathname, { access: 'private', useCache: false });
+  async read(pathname, options) {
+    const result = await get(pathname, {
+      access: 'private',
+      useCache: options?.useCache ?? false,
+    });
     if (!result) {
       throw Object.assign(
         new Error('Immutable Blob was not found for authenticated reconciliation.'),

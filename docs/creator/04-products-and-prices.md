@@ -67,7 +67,7 @@ npm run publish-design -- \
   --tags demo,starter
 ```
 
-The command writes to `design-systems/.registry.json`. The server reads the registry from disk on each request, so a running dev server picks up the new entry without a restart.
+The command updates both `design-systems/.registry.json` and the deployment-bundled catalog snapshot. A running local server reads the registry directly. For production, commit and deploy both changes together; `POST /admin/publish` is intentionally disabled in production because a running deployment cannot safely update its source-controlled snapshot.
 
 Your paid access URL will be:
 

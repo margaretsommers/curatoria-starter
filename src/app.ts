@@ -51,6 +51,7 @@ import {
 } from './rate-limit';
 import type { DesignCatalog, DesignSystemEntry, PublishRequest } from './types';
 import type { ResolvedResource } from './sources';
+import type { CommerceReadinessResult } from './commerce-readiness';
 import {
   emitObserved,
   outcomeFromStatus,
@@ -99,6 +100,21 @@ export type StorageStatusProvider = () => {
   dropbox: { enabled: boolean; oauth: boolean };
 };
 
+export type ServiceReadiness = {
+  public_site: { ready: true };
+  catalog: {
+    ready: boolean;
+    source: 'blob' | 'snapshot' | 'filesystem';
+    authoritative: boolean;
+    detail?: string;
+  };
+  commerce: {
+    ready: boolean;
+    storage: 'ready' | 'unavailable' | 'unknown';
+    detail?: string;
+  };
+};
+
 export type AppConfig = {
   walletAddress: string;
   network: string;
@@ -127,6 +143,8 @@ export type AppDependencies = {
   clock: () => number;
   logger: AppLogger;
   storageStatus: StorageStatusProvider;
+  readiness?: () => ServiceReadiness;
+  commercePreflight?: (productId?: string) => Promise<CommerceReadinessResult>;
   observe?: ObservabilitySink;
 };
 
@@ -246,21 +264,41 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): exp
   if (config.catalogPaywallEnabled) {
     app.get('/.well-known/design-catalog.json', discoverTeaser);
     app.get('/design-systems', discoverTeaser);
-    app.get('/catalog', dependencies.x402.catalogPaywall(paywallConfig), paidCatalog);
+    app.get(
+      '/catalog',
+      requireCommerceReady(dependencies),
+      dependencies.x402.catalogPaywall(paywallConfig),
+      paidCatalog,
+    );
   } else {
     app.get('/.well-known/design-catalog.json', discoverFull);
     app.get('/design-systems', discoverFull);
     app.get('/catalog', discoverFull);
   }
 
-  app.get('/health', (_req, res) => {
+  const healthHandler: RequestHandler = (_req, res) => {
+    const readiness = dependencies.readiness?.() ?? {
+      public_site: { ready: true as const },
+      catalog: {
+        ready: true,
+        source: 'filesystem' as const,
+        authoritative: true,
+      },
+      commerce: {
+        ready: Boolean(dependencies.assetDelivery),
+        storage: dependencies.assetDelivery ? 'unknown' as const : 'unavailable' as const,
+      },
+    };
     res.json({
-      status: 'ok',
+      status: readiness.public_site.ready ? 'ok' : 'unavailable',
       network: config.network,
       wallet: config.walletAddress,
+      readiness,
       storage: dependencies.storageStatus(),
     });
-  });
+  };
+  app.get('/health', healthHandler);
+  app.get('/ready', healthHandler);
 
   app.options('/assets/:id/purchase', assetCors);
   app.options('/assets/:id/recover', assetCors);
@@ -270,6 +308,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): exp
     assetCors,
     purchaseRateLimit,
     requireBinaryDelivery(dependencies.assetDelivery),
+    requireCommerceReady(dependencies),
     dependencies.x402.purchasePaywall({
       ...paywallConfig,
       expectedResourceType: 'binary_asset',
@@ -442,6 +481,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): exp
 
   app.get(
     '/design-systems/:id',
+    requireCommerceReady(dependencies),
     dependencies.x402.paywall({
       ...paywallConfig,
       expectedResourceType: 'design_md',
@@ -470,6 +510,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): exp
 
   app.get(
     '/packs/:id/download',
+    requireCommerceReady(dependencies),
     dependencies.x402.paywall({
       ...paywallConfig,
       expectedResourceType: 'bundle_zip',
@@ -497,6 +538,14 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): exp
   );
 
   app.post('/admin/publish', requireAdmin(config.adminApiKey), async (req, res, next) => {
+    if (config.production) {
+      res.status(409).json({
+        error: 'Runtime publication is disabled in production',
+        detail:
+          'Publish through the repository CLI so the bundled catalog snapshot is updated, reviewed, and deployed with the catalog change.',
+      });
+      return;
+    }
     const body = req.body as Partial<PublishRequest>;
 
     if (!body.id || !body.file || !body.name || !body.price_usd) {
@@ -584,6 +633,35 @@ function requireBinaryDelivery(assetDelivery: AssetDeliveryService | undefined):
       return;
     }
     next();
+  };
+}
+
+function requireCommerceReady(dependencies: AppDependencies): RequestHandler {
+  return (req, res, next) => {
+    const paymentAttempt =
+      Boolean(req.get('payment-signature')?.trim()) ||
+      Boolean(req.get('x-payment')?.trim());
+    if (!dependencies.commercePreflight || !paymentAttempt) {
+      next();
+      return;
+    }
+    void dependencies.commercePreflight(req.params.id).then(result => {
+      if (result.ready) {
+        next();
+        return;
+      }
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.status(503).json({
+        error: 'Commerce storage is temporarily unavailable',
+        detail: result.reason,
+      });
+    }).catch(error => {
+      dependencies.logger.error(
+        `Commerce readiness check failed: ${sanitizeLogError(error)}`,
+      );
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.status(503).json({ error: 'Commerce storage is temporarily unavailable' });
+    });
   };
 }
 

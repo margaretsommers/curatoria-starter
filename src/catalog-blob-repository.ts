@@ -14,15 +14,11 @@
  * `readCatalog()` in the CatalogRepository interface is synchronous, and
  * changing that would cascade through every caller (x402.ts, discovery.ts,
  * sitemap.ts, ...). Instead: composeApp() (already async) awaits one Blob
- * fetch during composition, before the Express app is ever returned, so the
- * first request already has a warm in-memory cache. Reads afterward are
- * synchronous against that cache, refreshed on a short TTL
- * (stale-while-revalidate: an expired cache is served immediately while a
- * background refetch runs) so a publish from a different warm instance
- * eventually becomes visible without needing a redeploy or restart, echoing
- * the filesystem version's "no caching by design" intent as closely as an
- * async network store allows. Writes update the in-memory cache immediately
- * so the writing instance sees its own change without waiting on the TTL.
+ * fetch during composition, before the Express app is ever returned. Reads
+ * afterward are synchronous against that cache and never trigger network
+ * traffic. Publication explicitly refreshes the authoritative document and
+ * updates the writing instance's cache. Deployments pick up external changes;
+ * there is deliberately no per-instance polling.
  */
 
 import type { BlobSdkAdapter } from './blob-storage';
@@ -31,8 +27,7 @@ import { assertPublishableCatalogEntry } from './catalog';
 import { resolveResource } from './sources';
 import type { DesignCatalog, DesignSystemEntry } from './types';
 
-const REGISTRY_PATHNAME = 'registry/v1/catalog.json';
-const DEFAULT_REFRESH_TTL_MS = 30_000;
+export const CATALOG_BLOB_PATHNAME = 'registry/v1/catalog.json';
 
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
@@ -73,8 +68,16 @@ function isValidCatalog(value: unknown): value is DesignCatalog {
 }
 
 export type BlobCatalogRepository = CatalogRepository & {
-  /** Fetches the registry once and populates the in-memory cache. Must resolve before the app serves its first request. */
+  /** Tries Blob once, then uses the deployment-bundled snapshot when Blob is unavailable. */
   initialize(): Promise<void>;
+  status(): CatalogRepositoryStatus;
+};
+
+export type CatalogRepositoryStatus = {
+  initialized: boolean;
+  source: 'blob' | 'snapshot';
+  authoritative: boolean;
+  error?: string;
 };
 
 /**
@@ -90,17 +93,20 @@ export type MutableJsonBlobWriter = (pathname: string, body: Uint8Array) => Prom
 export function createBlobCatalogRepository(
   sdk: BlobSdkAdapter,
   writeMutableJson: MutableJsonBlobWriter,
-  options: { refreshTtlMs?: number; seed?: DesignCatalog } = {},
+  options: { snapshot?: DesignCatalog } = {},
 ): BlobCatalogRepository {
-  const refreshTtlMs = options.refreshTtlMs ?? DEFAULT_REFRESH_TTL_MS;
-  let cache: DesignCatalog | undefined = options.seed;
-  let fetchedAtMs = options.seed ? Date.now() : 0;
-  let refreshing: Promise<void> | undefined;
+  const snapshot = options.snapshot;
+  let cache: DesignCatalog | undefined;
+  let currentStatus: CatalogRepositoryStatus = {
+    initialized: false,
+    source: 'snapshot',
+    authoritative: false,
+  };
 
   async function fetchCatalog(): Promise<DesignCatalog | undefined> {
     let read: Awaited<ReturnType<BlobSdkAdapter['read']>>;
     try {
-      read = await sdk.read(REGISTRY_PATHNAME);
+      read = await sdk.read(CATALOG_BLOB_PATHNAME, { useCache: true });
     } catch (error) {
       if (isNotFound(error)) return undefined;
       throw error;
@@ -116,43 +122,35 @@ export function createBlobCatalogRepository(
     return parsed;
   }
 
-  async function refreshNow(): Promise<void> {
-    const fresh = await fetchCatalog();
-    if (fresh) {
-      cache = fresh;
-      fetchedAtMs = Date.now();
-    }
-  }
-
-  function scheduleBackgroundRefreshIfStale(): void {
-    if (refreshing || Date.now() - fetchedAtMs < refreshTtlMs) return;
-    refreshing = refreshNow()
-      .catch(() => {
-        // A failed background refresh keeps serving the last good cache;
-        // the next stale read will try again.
-      })
-      .finally(() => {
-        refreshing = undefined;
-      });
-  }
-
   function requireCache(): DesignCatalog {
     if (!cache) {
       throw new Error(
         'Blob-backed catalog was read before initialize() completed. Call initialize() during app composition, before serving requests.',
       );
     }
-    scheduleBackgroundRefreshIfStale();
     return cache;
   }
 
   const repository: BlobCatalogRepository = {
     async initialize() {
-      cache = (await fetchCatalog()) ?? {
-        owner: { wallet: '0x0000000000000000000000000000000000000000', name: 'Curatoria' },
-        design_systems: [],
-      };
-      fetchedAtMs = Date.now();
+      try {
+        const fresh = await fetchCatalog();
+        if (!fresh) throw new Error('Blob-backed catalog registry was not found.');
+        cache = fresh;
+        currentStatus = { initialized: true, source: 'blob', authoritative: true };
+      } catch (error) {
+        if (!snapshot || !isValidCatalog(snapshot)) throw error;
+        cache = snapshot;
+        currentStatus = {
+          initialized: true,
+          source: 'snapshot',
+          authoritative: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+    status() {
+      return { ...currentStatus };
     },
     readCatalog() {
       return requireCache();
@@ -173,7 +171,7 @@ export function createBlobCatalogRepository(
         const existing = latest.design_systems[existingIndex];
         if (immutableEntryJson(existing) === immutableEntryJson(entry)) {
           cache = latest;
-          fetchedAtMs = Date.now();
+          currentStatus = { initialized: true, source: 'blob', authoritative: true };
           return;
         }
         throw new Error(`Catalog ID conflict: "${entry.id}" is already published.`);
@@ -183,9 +181,9 @@ export function createBlobCatalogRepository(
         design_systems: [...latest.design_systems, entry],
       };
       const body = Buffer.from(`${JSON.stringify(updated, null, 2)}\n`);
-      await writeMutableJson(REGISTRY_PATHNAME, body);
+      await writeMutableJson(CATALOG_BLOB_PATHNAME, body);
       cache = updated;
-      fetchedAtMs = Date.now();
+      currentStatus = { initialized: true, source: 'blob', authoritative: true };
     },
     resolveResource,
   };

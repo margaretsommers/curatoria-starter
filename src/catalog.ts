@@ -8,6 +8,7 @@ import { normalizeSha256 } from './content-integrity';
 import { sanitizeDownloadFilename } from './delivery';
 import { DesignCatalog, DesignSystemEntry } from './types';
 import { REGISTRY_PATH, resolveDesignSystemPath } from './paths';
+import { writeCatalogSnapshot } from './catalog-snapshot';
 
 const LOCK_TIMEOUT_MS = 15_000;
 const LOCK_STALE_MS = 30_000;
@@ -96,6 +97,7 @@ export function readBundleFile(entry: DesignSystemEntry): Buffer {
  */
 export async function appendEntry(entry: DesignSystemEntry): Promise<void> {
   await publishCatalogEntry(entry);
+  writeCatalogSnapshot();
 
   try {
     writeSitemapFile();

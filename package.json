@@ -38,13 +38,17 @@
     "node": ">=20.0.0"
   },
   "overrides": {
-    "axios": "1.18.0",
-    "body-parser": "1.20.6",
+    "axios": "1.20.0",
+    "body-parser": "1.20.9",
     "brace-expansion": "1.1.18",
-    "fast-uri": "3.1.6",
+    "fast-uri": "3.1.9",
+    "follow-redirects": "1.16.1",
     "form-data": "4.0.6",
+    "proxy-addr": "2.0.8",
     "qs": "6.16.0",
-    "ws": "8.21.0"
+    "undici": "6.29.1",
+    "ws": "8.21.0",
+    "zod": "4.6.6"
   },
   "dependencies": {
     "@x402/core": "^2.15.0",
